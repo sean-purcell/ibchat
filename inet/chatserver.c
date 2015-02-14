@@ -3,6 +3,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -22,7 +23,7 @@ void *handle_connection(void *arg) {
 	fd_set set;
 	struct timeval wait;
 
-	const size_t BUFSIZE = 1;
+	const size_t BUFSIZE = 1024;
 	char buf[BUFSIZE + 1];
 	buf[BUFSIZE] = '\0';
 
@@ -55,6 +56,8 @@ void *handle_connection(void *arg) {
 			}
 			total += written;
 		}
+
+		printf("%d: %s", sockfd, buf);
 	}
 }
 
