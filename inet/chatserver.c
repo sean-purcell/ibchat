@@ -89,6 +89,7 @@ int main(int argc, char **argv) {
 	memset(&hints, 0x00, sizeof(hints));
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
 	hints.ai_flags = AI_PASSIVE; /* local ip */
 
 	if((ret = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
@@ -106,11 +107,13 @@ int main(int argc, char **argv) {
 		int yes = 1;
 		if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
 			sizeof(int)) == -1) {
+			close(sockfd);
 			perror("server: setsockopt");
 			exit(1);
 		}
 
 		if(bind(sockfd, server->ai_addr, server->ai_addrlen) == -1) {
+			close(sockfd);
 			perror("server: bind");
 			continue;
 		}
