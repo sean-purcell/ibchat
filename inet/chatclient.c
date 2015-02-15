@@ -18,7 +18,7 @@
 #include <pthread.h>
 
 #define PORT "3490"
-
+/*
 #ifdef __linux__
 # define TCP_KEEPALIVE_IDLE TCP_KEEPIDLE
 # define TCP_KEEPALIVE_INTERVAL TCP_KEEPINTVL
@@ -29,7 +29,7 @@
 # define TCP_KEEPALIVE_INTERVAL TCP_KEEPINTVL
 # define TCP_KEEPALIVE_COUNT TCP_KEEPCNT
 #endif
-
+*/
 void chat(int sockfd) {
 	const int BUFLEN = 128;
 	char buf[BUFLEN + 1];
@@ -157,7 +157,7 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 	printf("client: connected to %s\n", s);
-
+/*
 	int idle = 1;
 	int intvl = 1;
 	int cnt = 4;
@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
 	if(setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &yes, sizeof(yes)) != 0) {
 		perror("client: setsockopt");
 	}
-
+*/
 	chat(sockfd);
 }
 
