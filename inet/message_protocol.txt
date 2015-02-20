@@ -1,0 +1,28 @@
+Message format
+==============
+
+offset    description
+--------- -----------
+0x00-0x10 message type, repeated 0x10 times
+0x10-X    message contents
+X-X+0x10  0x00, signifies end of message
+
+type 0x01
+---------
+message acknowledge
+
+offset    description
+--------- -----------
+0x10-0x18 sequence number of message to acknowledge
+
+type 0x02
+---------
+message
+
+offset    description
+--------- -----------
+0x10-0x18 sequence number of message, must be higher than previous numbers
+0x18-0x20 length X of message, 64-bit, big-endian
+0x20-X+32 message contents
+X-X+0x20  sha256 hash of message
+

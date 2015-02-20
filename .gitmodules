@@ -1,0 +1,6 @@
+[submodule "ibcrypt"]
+	path = ibcrypt
+	url = https://github.com/iburinoc/ibcrypt
+[submodule "libibur"]
+	path = libibur
+	url = https://github.com/iburinoc/libibur
