@@ -1,0 +1,5 @@
+#ifndef IBCHAT_UTIL_MESSAGE_QUEUE_H
+#define IBCHAT_UTIL_MESSAGE_QUEUE_H
+
+#endif
+

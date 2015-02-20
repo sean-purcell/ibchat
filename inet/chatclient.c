@@ -66,9 +66,11 @@ void chat(int sockfd) {
 			ssize_t total = 0;
 			while(total < lread) {
 				ssize_t written = send(sockfd, &buf[total], lread - total, 0);
-				if(written == 0) {
+				if(written == -1) {
 					perror("client: write err");
 					continue;
+				} else if(written == 0) {
+					printf("wrote no bytes\n");
 				}
 				total += written;
 			}
