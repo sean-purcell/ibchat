@@ -14,5 +14,7 @@ struct connection {
 	pthread_mutex_t *in_mutex;
 };
 
+void *handle_connection(void *_con);
+
 #endif
 

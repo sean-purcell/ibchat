@@ -25,7 +25,7 @@ static ssize_t send_message(int fd, void *buf, size_t len, int flags, uint64_t t
 
 /* handles a connection to the client or server, made to be run as a thread */
 /* _con should be of type connection */
-void handle_connection(void *_con) {
+void *handle_connection(void *_con) {
 	struct connection con = *((struct connection *) _con);
 
 	uint8_t inbuf[INBUF_SIZE + 1];
@@ -84,7 +84,7 @@ void handle_connection(void *_con) {
 exit:
 	puts("exiting");
 	close(con.sockfd);
-	return;
+	return NULL;
 }
 
 static int write_messages(struct connection *con) {
