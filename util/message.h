@@ -16,6 +16,12 @@ struct message_queue {
 	struct message_queue_element *last;
 };
 
+struct message_queue_element {
+	struct message *m;
+	struct message_queue_element *next;
+};
+
+
 extern const struct message_queue EMPTY_MESSAGE_QUEUE;
 
 struct message *message_queue_top(struct message_queue *queue);

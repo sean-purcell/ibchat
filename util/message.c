@@ -3,11 +3,6 @@
 
 #include "message.h"
 
-struct message_queue_element {
-	struct message *m;
-	struct message_queue_element *next;
-};
-
 const struct message_queue EMPTY_MESSAGE_QUEUE = {0, NULL, NULL};
 
 void message_queue_init(struct message_queue *queue) {

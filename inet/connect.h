@@ -3,14 +3,14 @@
 
 #include <arpa/inet.h>
 
-struct connection {
+struct sock {
 	int fd;
 	char address[INET6_ADDRSTRLEN];
 };
 
-int connect(char *address, char *port);
-int open_host(char *port);
-int accept_connection(int sockfd);
+struct sock client_connect(char *address, char *port);
+struct sock server_bind(char *port);
+struct sock server_accept(int sockfd);
 
 #endif
 

@@ -1,3 +1,6 @@
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include <errno.h>
 #include <netdb.h>
 
@@ -8,18 +11,18 @@
 
 #define CONNECT_BACKLOG (100)
 
-static struct sockaddr *get_inet_address(struct sockaddr *addr) {
+static void *get_inet_address(struct sockaddr *addr) {
 	switch(addr->sa_family) {
 	case AF_INET:
-		return ((struct sockaddr_in *) addr)->sin_addr;
+		return &((struct sockaddr_in *) addr)->sin_addr;
 	case AF_INET6:
-		return ((struct sockaddr_in6 *) addr)->sin6_addr;
+		return &((struct sockaddr_in6 *) addr)->sin6_addr;
 	default:
 		return NULL;
 	}
 }
 
-struct connection connect(char *address, char *port) {
+struct sock client_connect(char *address, char *port) {
 	int ret;
 
 	struct addrinfo hints;
@@ -28,7 +31,7 @@ struct connection connect(char *address, char *port) {
 
 	socklen_t size;
 
-	struct connection con;
+	struct sock con;
 
 	memset(&hints, 0x00, sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -73,14 +76,14 @@ struct connection connect(char *address, char *port) {
 	return con;
 }
 
-struct connection open_host(char *port) {
+struct sock server_bind(char *port) {
 	int ret;
 
 	struct addrinfo hints;
 	struct addrinfo *servinfo;
 	struct addrinfo *server;
 
-	struct connection con;
+	struct sock con;
 
 	memset(&hints, 0x00, sizeof(hints));
 	hints.ai_family = AF_INET;
@@ -138,13 +141,13 @@ struct connection open_host(char *port) {
 	return con;
 }
 
-int accept_connection(int servfd) {
+struct sock server_accept(int servfd) {
 	struct sockaddr_storage client_addr;
-	size_t sin_size;
+	socklen_t sin_size;
 
-	struct connection con;
+	struct sock con;
 
-	sin_size = sizeof(client_address);
+	sin_size = sizeof(client_addr);
 	if((con.fd = accept(servfd, (struct sockaddr *) &client_addr, &sin_size)) == -1) {
 		return con;
 	}

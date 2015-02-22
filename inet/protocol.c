@@ -12,6 +12,8 @@
 
 #include <ibcrypt/sha256.h>
 
+#include <libibur/endian.h>
+
 #include "../util/message.h"
 #include "protocol.h"
 
@@ -26,7 +28,7 @@ static ssize_t send_message(int fd, void *buf, size_t len, int flags, uint64_t t
 /* handles a connection to the client or server, made to be run as a thread */
 /* _con should be of type connection */
 void *handle_connection(void *_con) {
-	struct connection con = *((struct connection *) _con);
+	struct connection *con = ((struct connection *) _con);
 
 	uint8_t inbuf[INBUF_SIZE + 1];
 
@@ -37,8 +39,8 @@ void *handle_connection(void *_con) {
 	int ret;
 
 	while(1) {
-		FD_SET(con.sockfd, &rset);
-		FD_SET(con.sockfd, &wset);
+		FD_SET(con->sockfd, &rset);
+		FD_SET(con->sockfd, &wset);
 		select_wait.tv_sec = 0;
 		select_wait.tv_usec = WAIT_TIMEOUT;
 
@@ -47,9 +49,9 @@ void *handle_connection(void *_con) {
 			continue;
 		}
 
-		if(FD_ISSET(con.sockfd, &rset)) {
+		if(FD_ISSET(con->sockfd, &rset)) {
 			/* handle incoming read */
-			ssize_t read = recv(con.sockfd, inbuf, 0x10, 0);
+			ssize_t read = recv(con->sockfd, inbuf, 0x10, 0);
 			if(read == -1) {
 				perror("read error");
 				goto endread;
@@ -60,8 +62,8 @@ void *handle_connection(void *_con) {
 		}
 		endread:;
 
-		if(FD_ISSET(con.sockfd, &wset)) {
-			ret = pthread_mutex_trylock(con.out_mutex);
+		if(FD_ISSET(con->sockfd, &wset)) {
+			ret = pthread_mutex_trylock(&con->out_mutex);
 			if(ret == -1) {
 				if(errno != EBUSY) {
 					perror("mutex lock error");
@@ -69,46 +71,94 @@ void *handle_connection(void *_con) {
 				}
 			}
 
-			if(con.out_queue->size > 0) {
-				ret = write_messages(&con);
+			if(con->out_queue.size > 0) {
+				ret = write_messages(con);
 				if(ret != 0) {
 					
 				}
 			}
 
-			pthread_mutex_unlock(con.out_mutex);
+			pthread_mutex_unlock(&con->out_mutex);
 		}
 		endwrite:;
 	}
 
 exit:
 	puts("exiting");
-	close(con.sockfd);
+	close(con->sockfd);
 	return NULL;
 }
 
 static int write_messages(struct connection *con) {
 	/* buffer for message type, ending zeroes, etc. */
-	uint8_t buf[0x10];
+	uint8_t buf[8];
+	uint8_t hash[32];
 	ssize_t written;
 	ssize_t total;
-	while(con->out_queue->size > 0) {
-		struct message *next_message = message_queue_top(con->out_queue);
+	while(con->out_queue.size > 0) {
+		struct message *next_message = message_queue_top(&con->out_queue);
 
-		memset(buf, 2, 0x10);
+		/* calculate sha256 hash */
+		sha256(next_message->message, next_message->length, hash);
 
-		/* give writing the types 50ms */
-		written = send_message(con->sockfd, buf, 0x10, 0, 50000ULL);
-		if(written == -1) {
+		/* give writing the type 5ms */
+		encbe32(2, buf);
+		if((written = send_message(con->sockfd, buf, 4, 0, 5000ULL))
+			== -1) {
 			goto error;
 		}
 
-		if(written != 0x10) {
+		if(written != 4) {
 			errno = ETIME;
 			goto error;
 		}
 
-		message_queue_pop(con->out_queue);
+		/* write seqnum */
+		encbe64(next_message->seq_num, buf);
+		/* limit seqnum writing to 10ms */
+		if((written = send_message(con->sockfd, buf, 8, 0, 10000ULL))
+			== -1) {
+			goto error;
+		}
+		if(written != 8) {
+			errno = ETIME;
+			goto error;
+		}
+		/* write length */
+		encbe64(next_message->length, buf);
+		/* limit length writing to 10ms */
+		if((written = send_message(con->sockfd, buf, 8, 0, 10000ULL))
+			== -1) {
+			goto error;
+		}
+		if(written != 8) {
+			errno = ETIME;
+			goto error;
+		}
+
+		/* leave 50ms to write the message, we don't want to take too
+		 * long */
+		written = send_message(con->sockfd, next_message->message,
+			next_message->length, 0, 50000ULL);
+		if(written == -1) {
+			goto error;
+		}
+		if(written != next_message->length) {
+			errno = ETIME;
+			goto error;
+		}
+
+		/* write the hash */
+		if((written = send_message(con->sockfd, hash, 32, 0, 10000ULL))
+			== -1) {
+			goto error;
+		}
+		if(written != 32) {
+			errno = ETIME;
+			goto error;
+		}
+
+		message_queue_pop(&con->out_queue);
 	}
 
 exit:
