@@ -17,6 +17,7 @@
 #define PORT "30476"
 
 int main(int argc, char **argv) {
+	signal(SIGPIPE, SIG_IGN);
 	struct sock serv = server_bind(PORT);
 	if(serv.fd == -1) {
 		if(errno == 0) {
@@ -61,8 +62,8 @@ int main(int argc, char **argv) {
 		pthread_mutex_unlock(&con.out_mutex);
 
 		pthread_mutex_lock(&con.in_mutex);
-		if(con.in_queue.size > 0) {
-			m = message_queue_pop(&con.out_queue);
+		while(con.in_queue.size > 0) {
+			m = message_queue_pop(&con.in_queue);
 			printf("%llu: %s\n", m->seq_num, m->message);
 		}
 		pthread_mutex_unlock(&con.in_mutex);

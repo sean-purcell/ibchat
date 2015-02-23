@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <errno.h>
+#include <signal.h>
 
 #include <libibur/endian.h>
 
@@ -15,6 +16,7 @@
 #define PORT "30476"
 
 int main(int argc, char **argv) {
+	signal(SIGPIPE, SIG_IGN);
 	if(argc != 2) {
 		fprintf(stderr, "%s <address>\n", argv[0]);
 		return 1;
@@ -56,8 +58,8 @@ int main(int argc, char **argv) {
 		pthread_mutex_unlock(&con.out_mutex);
 
 		pthread_mutex_lock(&con.in_mutex);
-		if(con.in_queue.size > 0) {
-			m = message_queue_pop(&con.out_queue);
+		while(con.in_queue.size > 0) {
+			m = message_queue_pop(&con.in_queue);
 			printf("%llu: %s\n", m->seq_num, m->message);
 		}
 		pthread_mutex_unlock(&con.in_mutex);

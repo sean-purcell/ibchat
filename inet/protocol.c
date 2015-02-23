@@ -26,10 +26,18 @@
 #define INBUF_SIZE (4096)
 
 /* error handling */
+#ifndef PROTO_DEBUG
 #define IO_CHECK(x, y) {                                                       \
 	if((x) == -1) { goto error; }                                          \
 	if((x) != (y)) { errno = ETIME; goto error; }                          \
 }
+#else
+#define IO_CHECK(x, y) {                                                       \
+        if((x) == -1) { goto error; }                                          \
+        if((x) != (y)) { fprintf(stderr, "%d: IO_CHECK failed\n", __LINE__);   \
+                errno = ETIME; goto error;}                                    \
+}
+#endif
 
 #define ACK_MAP_MASK 0xff
 #define ACK_MAP_FAIL ((uint64_t)-1)
@@ -96,7 +104,7 @@ void *handle_connection(void *_con) {
 				if(errno != EBUSY) {
 					fprintf(stderr, "%d: mutex lock error: %s\n",
 						__LINE__, strerror(errno));
-					goto exit;
+					goto error;
 				}
 
 				goto endread;
@@ -105,7 +113,7 @@ void *handle_connection(void *_con) {
 			ret = read_message(con, &map);
 			if(ret != 0) {
 				pthread_mutex_unlock(&con->in_mutex);
-				goto exit;
+				goto error;
 			}
 
 			pthread_mutex_unlock(&con->in_mutex);
@@ -118,7 +126,7 @@ void *handle_connection(void *_con) {
 				if(errno != EBUSY) {
 					fprintf(stderr, "%d: mutex lock error: %s\n",
 						__LINE__, strerror(errno));
-					goto exit;
+					goto error;
 				}
 
 				goto endwrite;
@@ -131,7 +139,7 @@ void *handle_connection(void *_con) {
 #ifdef PROTO_DEBUG
 					printf("connection closed\n");
 #endif
-					goto exit;
+					goto error;
 				}
 			}
 
@@ -153,7 +161,7 @@ void *handle_connection(void *_con) {
 					       "in time\n", el->seq_num);
 #endif
 					errno = ETIME;
-					goto exit;
+					goto error;
 				}
 
 				el = el->next;
@@ -161,6 +169,8 @@ void *handle_connection(void *_con) {
 		}
 	}
 
+error:
+	perror("connection error");
 exit:
 	puts("exiting");
 	close(con->sockfd);
@@ -242,11 +252,12 @@ static int read_message(struct connection *con, struct ack_map *map) {
 		received = read_bytes(con->sockfd, buf, 8, 0, 10000ULL);
 		IO_CHECK(received, 8);
 		if(ack_map_rm(map, decbe64(buf)) == -1) {
+			fprintf(stderr, "ack_map doesn't contain key\n");
 			errno = EINVAL;
 			goto error;
 		}
 #ifdef PROTO_DEBUG
-		printf("%llu ack'ed", decbe64(buf));
+		printf("%llu ack'ed\n", decbe64(buf));
 #endif
 		break;
 	case 2: /* new message */
@@ -269,8 +280,8 @@ static int read_message(struct connection *con, struct ack_map *map) {
 			goto error;
 		}
 
-		received = read_bytes(con->sockfd, buf, in_message->length, 0,
-			50000ULL);
+		received = read_bytes(con->sockfd, in_message->message,
+			in_message->length, 0, 50000ULL);
 		IO_CHECK(received, in_message->length);
 
 		received = read_bytes(con->sockfd, hash1, 32, 0, 10000ULL);
@@ -278,7 +289,7 @@ static int read_message(struct connection *con, struct ack_map *map) {
 
 		sha256(in_message->message, in_message->length, hash2);
 		if(memcmp(hash1, hash2, 32) != 0) {
-			errno = EINVAL;
+			errno = EPROTO;
 			goto error;
 		}
 
@@ -294,6 +305,7 @@ static int read_message(struct connection *con, struct ack_map *map) {
 #endif
 		break;
 	default:
+		fprintf(stderr, "invalid type value: %llu\n", (uint64_t)type);
 		errno = EINVAL;
 		goto error;
 	}
@@ -404,9 +416,9 @@ static int write_acknowledge(struct connection *con, uint64_t seq_num) {
 	uint8_t buf[8];
 	ssize_t written;
 
-	encbe64(1, buf);
-	written = send_bytes(con->sockfd, buf, 8, 0, 5000ULL);
-	IO_CHECK(written, 8);
+	encbe32(1, buf);
+	written = send_bytes(con->sockfd, buf, 4, 0, 5000ULL);
+	IO_CHECK(written, 4);
 
 	encbe64(seq_num, buf);
 	written = send_bytes(con->sockfd, buf, 8, 0, 5000ULL);
