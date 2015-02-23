@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
 #include <pthread.h>
+#include <unistd.h>
 #include <errno.h>
 
 #include "../inet/connect.h"
@@ -14,7 +17,7 @@ int main(int argc, char **argv) {
 	struct sock serv = server_bind(PORT);
 	if(serv.fd == -1) {
 		if(errno == 0) {
-			fprintf(stderr, "getaddrinfo failed");
+			fprintf(stderr, "getaddrinfo failed\n");
 		} else {
 			perror("bind error");
 		}
@@ -41,5 +44,16 @@ int main(int argc, char **argv) {
 
 	pthread_t handler;
 	pthread_create(&handler, NULL, handle_connection, &con);
+
+	char *m = "this is a very non-secret secret.\n";
+	struct message mstr = {strlen(m) + 1, 5, (uint8_t *) m};
+
+	printf("writing message of length %zu:\n%s", strlen(m) + 1, m);
+
+	pthread_mutex_lock(&con.out_mutex);
+	message_queue_push(&con.out_queue, &mstr);
+	pthread_mutex_unlock(&con.out_mutex);
+
+	pthread_join(handler, NULL);
 }
 
