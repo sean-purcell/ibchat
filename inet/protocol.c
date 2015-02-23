@@ -128,6 +128,9 @@ void *handle_connection(void *_con) {
 				ret = write_messages(con, &map);
 				if(ret != 0) {
 					pthread_mutex_unlock(&con->out_mutex);
+#ifdef PROTO_DEBUG
+					printf("connection closed\n");
+#endif
 					goto exit;
 				}
 			}

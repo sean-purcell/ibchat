@@ -2,9 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <signal.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <errno.h>
+
+#include <libibur/endian.h>
 
 #include "../inet/connect.h"
 #include "../inet/protocol.h"
@@ -45,15 +48,27 @@ int main(int argc, char **argv) {
 	pthread_t handler;
 	pthread_create(&handler, NULL, handle_connection, &con);
 
-	char *m = "this is a very non-secret secret.\n";
-	struct message mstr = {strlen(m) + 1, 5, (uint8_t *) m};
+	uint32_t ctr = 0;
+	while(pthread_kill(handler, 0) != ESRCH) {
+		struct message *m = malloc(sizeof(struct message));
+		m->message = malloc(256);
+		sprintf((char *)m->message, "%d", ctr);
+		m->seq_num = ctr;
+		m->length = strlen((char *)m->message) + 1;
 
-	printf("writing message of length %zu:\n%s", strlen(m) + 1, m);
+		pthread_mutex_lock(&con.out_mutex);
+		message_queue_push(&con.out_queue, m);
+		pthread_mutex_unlock(&con.out_mutex);
 
-	pthread_mutex_lock(&con.out_mutex);
-	message_queue_push(&con.out_queue, &mstr);
-	pthread_mutex_unlock(&con.out_mutex);
+		pthread_mutex_lock(&con.in_mutex);
+		if(con.in_queue.size > 0) {
+			m = message_queue_pop(&con.out_queue);
+			printf("%llu: %s\n", m->seq_num, m->message);
+		}
+		pthread_mutex_unlock(&con.in_mutex);
 
-	pthread_join(handler, NULL);
+		ctr = (ctr + 1) % 256;
+		sleep(1);
+	}
 }
 

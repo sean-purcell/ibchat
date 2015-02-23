@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <errno.h>
@@ -31,17 +32,38 @@ int main(int argc, char **argv) {
 
 	printf("connected to %s\n", serv.address);
 
-	char buf[4096];
-	size_t total = 0;
-	while(total < 87) {
-		ssize_t read = recv(serv.fd, &buf[total], 87 - total, 0);
-		total += read;
-	}
+	struct connection con;
 
-	printf("%zd\n", total);
+	con.sockfd = serv.fd;
+	con.in_queue = EMPTY_MESSAGE_QUEUE;
+	con.out_queue = EMPTY_MESSAGE_QUEUE;
+	pthread_mutex_init(&con.in_mutex, NULL);
+	pthread_mutex_init(&con.out_mutex, NULL);
 
-	for(size_t i = 0; i < total; i++) {
-		putchar(buf[i]);
+	pthread_t handler;
+	pthread_create(&handler, NULL, handle_connection, &con);
+
+	uint32_t ctr = 0;
+	while(pthread_kill(handler, 0) != ESRCH) {
+		struct message *m = malloc(sizeof(struct message));
+		m->message = malloc(256);
+		sprintf((char *)m->message, "%d", ctr);
+		m->seq_num = ctr;
+		m->length = strlen((char *)m->message) + 1;
+
+		pthread_mutex_lock(&con.out_mutex);
+		message_queue_push(&con.out_queue, m);
+		pthread_mutex_unlock(&con.out_mutex);
+
+		pthread_mutex_lock(&con.in_mutex);
+		if(con.in_queue.size > 0) {
+			m = message_queue_pop(&con.out_queue);
+			printf("%llu: %s\n", m->seq_num, m->message);
+		}
+		pthread_mutex_unlock(&con.in_mutex);
+
+		ctr = (ctr + 1) % 256;
+		sleep(1);
 	}
 }
 
