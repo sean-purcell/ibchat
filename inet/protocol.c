@@ -18,6 +18,8 @@
 #include "../util/message.h"
 #include "protocol.h"
 
+#define PROTO_DEBUG
+
 #define WAIT_TIMEOUT (50000)
 #define ACK_WAITTIME (5000000ULL)
 
@@ -143,6 +145,10 @@ void *handle_connection(void *_con) {
 			el = map.lists[i];
 			while(el != NULL) {
 				if(el->time < earliest) {
+#ifdef PROTO_DEBUG
+					printf("%llu acknowledge not received "
+					       "in time\n", el->seq_num);
+#endif
 					errno = ETIME;
 					goto exit;
 				}
@@ -202,6 +208,10 @@ static int write_messages(struct connection *con, struct ack_map *map) {
 		}
 
 		message_queue_pop(&con->out_queue);
+
+#ifdef PROTO_DEBUG
+		printf("%llu sent\n", next_message->seq_num);
+#endif
 	}
 
 exit:
@@ -232,6 +242,9 @@ static int read_message(struct connection *con, struct ack_map *map) {
 			errno = EINVAL;
 			goto error;
 		}
+#ifdef PROTO_DEBUG
+		printf("%llu ack'ed", decbe64(buf));
+#endif
 		break;
 	case 2: /* new message */
 		in_message = malloc(sizeof(struct message));
@@ -273,8 +286,10 @@ static int read_message(struct connection *con, struct ack_map *map) {
 		if(write_acknowledge(con, in_message->seq_num) == -1) {
 			goto error;
 		}
+#ifdef PROTO_DEBUG
+		printf("%llu ack sent\n", in_message->seq_num);
+#endif
 		break;
-
 	default:
 		errno = EINVAL;
 		goto error;
