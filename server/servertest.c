@@ -50,26 +50,34 @@ int main(int argc, char **argv) {
 	pthread_create(&handler, NULL, handle_connection, &con);
 
 	uint32_t ctr = 0;
+	struct message m;
+	m.message = malloc(256);
+	sprintf((char*)m.message, "%d", 10);
+	m.seq_num = 0;
+	m.length = strlen((char*)m.message) + 1;
+	pthread_mutex_lock(&con.out_mutex);
+	message_queue_push(&con.out_queue, &m);
+	pthread_mutex_unlock(&con.out_mutex);
+	ctr++;
 	while(pthread_kill(handler, 0) != ESRCH) {
-		struct message *m = malloc(sizeof(struct message));
-		m->message = malloc(256);
-		sprintf((char *)m->message, "%d", ctr);
-		m->seq_num = ctr;
-		m->length = strlen((char *)m->message) + 1;
-
-		pthread_mutex_lock(&con.out_mutex);
-		message_queue_push(&con.out_queue, m);
-		pthread_mutex_unlock(&con.out_mutex);
-
 		pthread_mutex_lock(&con.in_mutex);
-		while(con.in_queue.size > 0) {
-			m = message_queue_pop(&con.in_queue);
-			printf("%llu: %s\n", m->seq_num, m->message);
+		if(con.in_queue.size > 0) {
+			struct message *in = message_queue_pop(&con.in_queue);
+			printf("%llu: %s\n", in->seq_num, in->message);
+
+			int a = atoi((char*)in->message);
+			sprintf((char*)m.message, "%d", a * 3);
+			m.seq_num = ctr;
+			m.length = strlen((char*)m.message) + 1;
+
+			pthread_mutex_lock(&con.out_mutex);
+			message_queue_push(&con.out_queue, &m);
+			pthread_mutex_unlock(&con.out_mutex);
+			ctr++;
 		}
 		pthread_mutex_unlock(&con.in_mutex);
 
-		ctr = (ctr + 1) % 256;
-		usleep(10000);
+		usleep(500000);
 	}
 }
 
