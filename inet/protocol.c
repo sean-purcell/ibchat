@@ -18,7 +18,7 @@
 #include "../util/message.h"
 #include "protocol.h"
 
-#define PROTO_DEBUG
+//#define PROTO_DEBUG
 
 #define WAIT_TIMEOUT (50000)
 #define ACK_WAITTIME (5000000ULL)
@@ -100,8 +100,8 @@ void *handle_connection(void *_con) {
 
 		if(FD_ISSET(con->sockfd, &rset)) {
 			ret = pthread_mutex_trylock(&con->in_mutex);
-			if(ret == -1) {
-				if(errno != EBUSY) {
+			if(ret != 0) {
+				if(ret != EBUSY) {
 					fprintf(stderr, "%d: mutex lock error: %s\n",
 						__LINE__, strerror(errno));
 					goto error;
@@ -122,8 +122,8 @@ void *handle_connection(void *_con) {
 
 		if(FD_ISSET(con->sockfd, &wset)) {
 			ret = pthread_mutex_trylock(&con->out_mutex);
-			if(ret == -1) {
-				if(errno != EBUSY) {
+			if(ret != 0) {
+				if(ret != EBUSY) {
 					fprintf(stderr, "%d: mutex lock error: %s\n",
 						__LINE__, strerror(errno));
 					goto error;

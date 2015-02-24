@@ -53,16 +53,22 @@ int main(int argc, char **argv) {
 		m->seq_num = ctr;
 		m->length = strlen((char *)m->message) + 1;
 
+		printf("acquiring out\n");
 		pthread_mutex_lock(&con.out_mutex);
+		printf("out acquired\n");
 		message_queue_push(&con.out_queue, m);
 		pthread_mutex_unlock(&con.out_mutex);
+		printf("out released\n");
 
+		printf("acquring in\n");
 		pthread_mutex_lock(&con.in_mutex);
+		printf("in acquired\n");
 		while(con.in_queue.size > 0) {
 			m = message_queue_pop(&con.in_queue);
 			printf("%llu: %s\n", m->seq_num, m->message);
 		}
 		pthread_mutex_unlock(&con.in_mutex);
+		printf("in released\n");
 
 		ctr = (ctr + 1) % 256;
 		sleep(1);
