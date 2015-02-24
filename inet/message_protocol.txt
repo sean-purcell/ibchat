@@ -25,3 +25,7 @@ offset    description
 0x14-X    message contents
 X-X+0x20  sha256 hash of message
 
+type 0x03
+---------
+keep-alive
+

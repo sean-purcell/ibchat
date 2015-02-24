@@ -61,8 +61,13 @@ static int write_messages(struct connection *con, struct ack_map *map);
 static int read_message(struct connection *con, struct ack_map *map);
 static ssize_t send_bytes(int fd, void *buf, size_t len, int flags, uint64_t timeout);
 static ssize_t read_bytes(int fd, void *buf, size_t len, int flags, uint64_t timeout);
+static int write_keepalive(struct connection *con);
 static int write_acknowledge(struct connection *con, uint64_t seq_num);
 static int acknowledge_add(struct ack_map *map, uint64_t seq_num);
+
+uint64_t utime(struct timeval tv) {
+	return (uint64_t)tv.tv_sec * 1000000ULL + (uint64_t)tv.tv_usec;
+}
 
 /* handles a connection to the client or server, made to be run as a thread */
 /* _con should be of type connection */
@@ -76,6 +81,12 @@ void *handle_connection(void *_con) {
 	fd_set wset;
 	struct timeval select_wait;
 	struct timeval now;
+
+	uint64_t ka_last_sent;
+
+	gettimeofday(&now, NULL);
+	ka_last_sent = utime(now);
+	con->ka_last_recv = ka_last_sent;
 
 	size_t i;
 	struct ack_map_el *el;
@@ -149,13 +160,12 @@ void *handle_connection(void *_con) {
 
 		/* check the acknowledges to make sure we're not overrun now */
 		gettimeofday(&now, NULL);
-		uint64_t earliest = (uint64_t)now.tv_sec * 1000000 +
-			now.tv_usec - ACK_WAITTIME;
+		uint64_t earliest_ack = utime(now) - ACK_WAITTIME;
 
 		for(i = 0; i <= ACK_MAP_MASK; i++) {
 			el = map.lists[i];
 			while(el != NULL) {
-				if(el->time < earliest) {
+				if(el->time < earliest_ack) {
 #ifdef PROTO_DEBUG
 					printf("%llu acknowledge not received "
 					       "in time\n", el->seq_num);
@@ -166,6 +176,22 @@ void *handle_connection(void *_con) {
 
 				el = el->next;
 			}
+		}
+
+		if(utime(now) - ACK_WAITTIME > con->ka_last_recv) {
+#ifdef PROTO_DEBUG
+			printf("keep alive not received in time\n");
+#endif
+			errno = ETIME;
+			goto error;
+		}
+
+		if(utime(now) - ACK_WAITTIME / 2 > ka_last_sent) {
+			ret = write_keepalive(con);
+			if(ret == -1) {
+				goto error;
+			}
+			ka_last_sent = utime(now);
 		}
 	}
 
@@ -243,6 +269,8 @@ static int read_message(struct connection *con, struct ack_map *map) {
 
 	struct message *in_message;
 
+	struct timeval now;
+
 	received = read_bytes(con->sockfd, buf, 4, 0, 5000ULL);
 	IO_CHECK(received, 4);
 
@@ -258,6 +286,13 @@ static int read_message(struct connection *con, struct ack_map *map) {
 		}
 #ifdef PROTO_DEBUG
 		printf("%llu ack'ed\n", decbe64(buf));
+#endif
+		break;
+	case 3: /* KA */
+		gettimeofday(&now, NULL);
+		con->ka_last_recv = utime(now);
+#ifdef PROTO_DEBUG
+		printf("ka received\n");
 #endif
 		break;
 	case 2: /* new message */
@@ -354,9 +389,7 @@ static ssize_t send_bytes(int fd, void *buf, size_t len, int flags, uint64_t tim
 		total += written;
 	loopend:
 		gettimeofday(&cur, NULL);
-		timediff =
-			((uint64_t)cur.tv_sec * 1000000ULL + cur.tv_usec) -
-			((uint64_t)start.tv_sec * 1000000ULL + start.tv_usec);
+		timediff = utime(cur) - utime(start);
 	} while(timediff < timeout && total < len);
 
 	return total;
@@ -402,12 +435,24 @@ static ssize_t read_bytes(int fd, void *buf, size_t len, int flags, uint64_t tim
 		total += received;
 	loopend:
 		gettimeofday(&cur, NULL);
-		timediff =
-			((uint64_t)cur.tv_sec * 1000000ULL + cur.tv_usec) -
-			((uint64_t)start.tv_sec * 1000000ULL + start.tv_usec);
+		timediff = utime(cur) - utime(start);
 	} while(timediff < timeout && total < len);
 
 	return total;
+error:
+	return -1;
+}
+
+static int write_keepalive(struct connection *con) {
+	uint8_t buf[4];
+	ssize_t written;
+
+	encbe32(3, buf);
+	written = send_bytes(con->sockfd, buf, 4, 0, 5000ULL);
+	IO_CHECK(written, 4);
+
+exit:
+	return 0;
 error:
 	return -1;
 }
@@ -434,8 +479,7 @@ static int acknowledge_add(struct ack_map *map, uint64_t seq_num) {
 	struct timeval now;
 	gettimeofday(&now, NULL);
 
-	return ack_map_add(map, seq_num, (uint64_t)now.tv_sec * 1000000ULL +
-		now.tv_usec);
+	return ack_map_add(map, seq_num, utime(now));
 }
 
 /* values to be acknowledged map implementation */
