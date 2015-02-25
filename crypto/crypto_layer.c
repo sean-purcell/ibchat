@@ -6,6 +6,8 @@
 
 #include "../util/message.h"
 
+#include "crypto_layer.h"
+
 /* encrypts the given message using 256-bit chacha */
 /* returns NULL in the case of failure */
 struct message *encrypt_message(uint8_t key[32], uint64_t nonce, uint8_t *ptext, uint64_t len) {
