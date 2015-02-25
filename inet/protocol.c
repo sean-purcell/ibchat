@@ -15,7 +15,7 @@
 
 #include <libibur/endian.h>
 
-#include "../util/message.h"
+#include "message.h"
 #include "protocol.h"
 
 //#define PROTO_DEBUG

@@ -3,7 +3,7 @@
 
 #include <pthread.h>
 
-#include "../util/message.h"
+#include "message.h"
 
 struct connection {
 	int sockfd;

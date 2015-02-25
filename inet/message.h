@@ -1,5 +1,5 @@
-#ifndef IBCHAT_UTIL_MESSAGE_H
-#define IBCHAT_UTIL_MESSAGE_H
+#ifndef IBCHAT_INET_MESSAGE_H
+#define IBCHAT_INET_MESSAGE_H
 
 #include <stdint.h>
 
