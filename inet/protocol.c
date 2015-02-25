@@ -57,12 +57,12 @@ static int ack_map_add(struct ack_map *map, uint64_t seq_num, uint64_t time);
 static int ack_map_rm(struct ack_map *map, uint64_t seq_num);
 static uint64_t ack_map_get(struct ack_map *map, uint64_t seq_num);
 
-static int write_messages(struct connection *con, struct ack_map *map);
-static int read_message(struct connection *con, struct ack_map *map);
+static int write_messages(struct con_handle *con, struct ack_map *map);
+static int read_message(struct con_handle *con, struct ack_map *map);
 static ssize_t send_bytes(int fd, void *buf, size_t len, int flags, uint64_t timeout);
 static ssize_t read_bytes(int fd, void *buf, size_t len, int flags, uint64_t timeout);
-static int write_keepalive(struct connection *con);
-static int write_acknowledge(struct connection *con, uint64_t seq_num);
+static int write_keepalive(struct con_handle *con);
+static int write_acknowledge(struct con_handle *con, uint64_t seq_num);
 static int acknowledge_add(struct ack_map *map, uint64_t seq_num);
 
 uint64_t utime(struct timeval tv) {
@@ -70,14 +70,14 @@ uint64_t utime(struct timeval tv) {
 }
 
 /* you may NOT own the kill_mutex mutex when you call this function */
-void end_connection(struct connection *con) {
+void end_connection(struct con_handle *con) {
 	pthread_mutex_lock(&con->kill_mutex);
 	con->kill = 1;
 	pthread_mutex_unlock(&con->kill_mutex);
 }
 
 /* you may NOT own the kill_mutex mutex when you call this function */
-int connection_status(struct connection *con) {
+int connection_status(struct con_handle *con) {
 	int s;
 	pthread_mutex_lock(&con->kill_mutex);
 	s = con->kill;
@@ -86,7 +86,7 @@ int connection_status(struct connection *con) {
 }
 
 
-void init_connection(struct connection *con, int sockfd) {
+void init_connection(struct con_handle *con, int sockfd) {
 	con->sockfd = sockfd;
 	con->out_queue = EMPTY_MESSAGE_QUEUE;
 	con->in_queue = EMPTY_MESSAGE_QUEUE;
@@ -97,14 +97,14 @@ void init_connection(struct connection *con, int sockfd) {
 	con->kill = 0;
 }
 
-void destroy_connection(struct connection *con) {
+void destroy_connection(struct con_handle *con) {
 	pthread_mutex_destroy(&con->out_mutex);
 	pthread_mutex_destroy(&con->in_mutex);
 	pthread_mutex_destroy(&con->kill_mutex);
 }
 
 static void handler_cleanup(void *_con) {
-	struct connection *con = ((struct connection *) _con);
+	struct con_handle *con = ((struct con_handle *) _con);
 	end_connection(con);
 }
 
@@ -112,7 +112,7 @@ static void handler_cleanup(void *_con) {
 /* _con should be of type connection */
 void *handle_connection(void *_con) {
 	pthread_cleanup_push(handler_cleanup, _con);
-	struct connection *con = ((struct connection *) _con);
+	struct con_handle *con = ((struct con_handle *) _con);
 	struct ack_map map;
 
 	uint8_t inbuf[INBUF_SIZE + 1];
@@ -251,7 +251,7 @@ exit:
 	return NULL;
 }
 
-static int write_messages(struct connection *con, struct ack_map *map) {
+static int write_messages(struct con_handle *con, struct ack_map *map) {
 	/* buffer for message type, ending zeroes, etc. */
 	uint8_t buf[8];
 	uint8_t hash[32];
@@ -307,7 +307,7 @@ error:
 	return -1;
 }
 
-static int read_message(struct connection *con, struct ack_map *map) {
+static int read_message(struct con_handle *con, struct ack_map *map) {
 	uint8_t buf[8];
 	uint8_t hash1[32];
 	uint8_t hash2[32];
@@ -491,7 +491,7 @@ error:
 	return -1;
 }
 
-static int write_keepalive(struct connection *con) {
+static int write_keepalive(struct con_handle *con) {
 	uint8_t buf[4];
 	ssize_t written;
 
@@ -505,7 +505,7 @@ error:
 	return -1;
 }
 
-static int write_acknowledge(struct connection *con, uint64_t seq_num) {
+static int write_acknowledge(struct con_handle *con, uint64_t seq_num) {
 	uint8_t buf[8];
 	ssize_t written;
 

@@ -12,7 +12,7 @@
 #include "../inet/connect.h"
 #include "../inet/protocol.h"
 
-#include "../util/message.h"
+#include "../inet/message.h"
 
 #define PORT "30476"
 
@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	struct connection con;
+	struct con_handle con;
 
 	init_connection(&con, client.fd);
 

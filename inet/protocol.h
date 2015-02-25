@@ -5,7 +5,7 @@
 
 #include "message.h"
 
-struct connection {
+struct con_handle {
 	int sockfd;
 	struct message_queue out_queue;
 	pthread_mutex_t out_mutex;
@@ -18,10 +18,10 @@ struct connection {
 
 void *handle_connection(void *_con);
 
-int connection_status(struct connection *con);
-void end_connection(struct connection *con);
-void init_connection(struct connection *con, int sockfd);
-void destroy_connection(struct connection *con);
+int connection_status(struct con_handle *con);
+void end_connection(struct con_handle *con);
+void init_connection(struct con_handle *con, int sockfd);
+void destroy_connection(struct con_handle *con);
 
 #endif
 
