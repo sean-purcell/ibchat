@@ -1,0 +1,25 @@
+first message
+=============
+server->client
+
+this protocol assumes 2048-bit rsa keys are used
+
+0x000-0x210 rsa public key, in form specified by ibcrypt
+0x210-0x310 signature of public key hash by one of the trust anchors
+
+client->server
+0x000-0x100 key set, encrypted with the received public key
+
+key set:
+0x000-0x020 client->server symmetric key
+0x020-0x040 server->client symmetric key
+0x040-0x060 client hmac key
+0x060-0x080 server hmac key
+
+server->client
+0x000-0x020 hash of key set encrypted with server->client key
+0x020-0x040 hmac signature of above encrypted hash with server hmac key
+
+once this is complete, they are connected, and may communicate according to the
+ibchat application layer protocol
+
