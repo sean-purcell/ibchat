@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+/* seq_num is used as a nonce, so it MUST be unique */
 struct message {
 	uint64_t length;
 	uint64_t seq_num;

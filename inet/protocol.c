@@ -69,9 +69,49 @@ uint64_t utime(struct timeval tv) {
 	return (uint64_t)tv.tv_sec * 1000000ULL + (uint64_t)tv.tv_usec;
 }
 
+/* you may NOT own the kill_mutex mutex when you call this function */
+void end_connection(struct connection *con) {
+	pthread_mutex_lock(&con->kill_mutex);
+	con->kill = 1;
+	pthread_mutex_unlock(&con->kill_mutex);
+}
+
+/* you may NOT own the kill_mutex mutex when you call this function */
+int connection_status(struct connection *con) {
+	int s;
+	pthread_mutex_lock(&con->kill_mutex);
+	s = con->kill;
+	pthread_mutex_unlock(&con->kill_mutex);
+	return s;
+}
+
+
+void init_connection(struct connection *con, int sockfd) {
+	con->sockfd = sockfd;
+	con->out_queue = EMPTY_MESSAGE_QUEUE;
+	con->in_queue = EMPTY_MESSAGE_QUEUE;
+	pthread_mutex_init(&con->out_mutex, NULL);
+	pthread_mutex_init(&con->in_mutex, NULL);
+	pthread_mutex_init(&con->kill_mutex, NULL);
+	con->ka_last_recv = 0;
+	con->kill = 0;
+}
+
+void destroy_connection(struct connection *con) {
+	pthread_mutex_destroy(&con->out_mutex);
+	pthread_mutex_destroy(&con->in_mutex);
+	pthread_mutex_destroy(&con->kill_mutex);
+}
+
+static void handler_cleanup(void *_con) {
+	struct connection *con = ((struct connection *) _con);
+	end_connection(con);
+}
+
 /* handles a connection to the client or server, made to be run as a thread */
 /* _con should be of type connection */
 void *handle_connection(void *_con) {
+	pthread_cleanup_push(handler_cleanup, _con);
 	struct connection *con = ((struct connection *) _con);
 	struct ack_map map;
 
@@ -193,13 +233,21 @@ void *handle_connection(void *_con) {
 			}
 			ka_last_sent = utime(now);
 		}
+
+		if(connection_status(con) != 0) {
+			/* we have received the kill signal */
+			goto exit;
+		}
 	}
 
 error:
+#ifdef PROTO_DEBUG
 	perror("connection error");
+#endif
+	end_connection(con);
 exit:
-	puts("exiting");
 	close(con->sockfd);
+	pthread_cleanup_pop(0);
 	return NULL;
 }
 

@@ -36,11 +36,7 @@ int main(int argc, char **argv) {
 
 	struct connection con;
 
-	con.sockfd = serv.fd;
-	con.in_queue = EMPTY_MESSAGE_QUEUE;
-	con.out_queue = EMPTY_MESSAGE_QUEUE;
-	pthread_mutex_init(&con.in_mutex, NULL);
-	pthread_mutex_init(&con.out_mutex, NULL);
+	init_connection(&con, serv.fd);
 
 	pthread_t handler;
 	pthread_create(&handler, NULL, handle_connection, &con);
@@ -48,14 +44,14 @@ int main(int argc, char **argv) {
 	uint32_t ctr = 0;
 	struct message m;
 	m.message = malloc(256);
-	while(pthread_kill(handler, 0) != ESRCH) {
+	while(connection_status(&con) == 0) {
 		pthread_mutex_lock(&con.in_mutex);
 		if(con.in_queue.size > 0) {
 			struct message *in = message_queue_pop(&con.in_queue);
 			printf("%llu: %s\n", in->seq_num, in->message);
 
 			int a = atoi((char*)in->message);
-			sprintf((char*)m.message, "%d", a / 2);
+			sprintf((char*)m.message, "%d", a + 1);
 			m.seq_num = ctr;
 			m.length = strlen((char*)m.message) + 1;
 
@@ -63,10 +59,14 @@ int main(int argc, char **argv) {
 			message_queue_push(&con.out_queue, &m);
 			pthread_mutex_unlock(&con.out_mutex);
 			ctr++;
+
+			if(a > 256) end_connection(&con);
 		}
 		pthread_mutex_unlock(&con.in_mutex);
 
 		usleep(500000);
 	}
+
+	destroy_connection(&con);
 }
 
