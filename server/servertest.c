@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
 
 	struct con_handle con;
 
-	init_connection(&con, client.fd);
+	init_handler(&con, client.fd);
 
 	pthread_t handler;
 	pthread_create(&handler, NULL, handle_connection, &con);
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
 	message_queue_push(&con.out_queue, &m);
 	pthread_mutex_unlock(&con.out_mutex);
 	ctr++;
-	while(connection_status(&con) == 0) {
+	while(handler_status(&con) == 0) {
 		pthread_mutex_lock(&con.in_mutex);
 		if(con.in_queue.size > 0) {
 			struct message *in = message_queue_pop(&con.in_queue);
@@ -76,6 +76,6 @@ int main(int argc, char **argv) {
 		usleep(500000);
 	}
 
-	destroy_connection(&con);
+	destroy_handler(&con);
 }
 

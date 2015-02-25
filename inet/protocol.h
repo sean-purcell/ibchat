@@ -18,10 +18,10 @@ struct con_handle {
 
 void *handle_connection(void *_con);
 
-int connection_status(struct con_handle *con);
-void end_connection(struct con_handle *con);
-void init_connection(struct con_handle *con, int sockfd);
-void destroy_connection(struct con_handle *con);
+int handler_status(struct con_handle *con);
+void end_handler(struct con_handle *con);
+void init_handler(struct con_handle *con, int sockfd);
+void destroy_handler(struct con_handle *con);
 
 #endif
 
