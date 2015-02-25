@@ -144,8 +144,10 @@ void *handle_connection(void *_con) {
 		select_wait.tv_usec = WAIT_TIMEOUT;
 
 		if(select(FD_SETSIZE, &rset, &wset, NULL, &select_wait) == -1) {
+#ifdef PROTO_DEBUG
 			fprintf(stderr, "%d: select error: %s\n", __LINE__,
 				strerror(errno));
+#endif
 			continue;
 		}
 
@@ -153,8 +155,10 @@ void *handle_connection(void *_con) {
 			ret = pthread_mutex_trylock(&con->in_mutex);
 			if(ret != 0) {
 				if(ret != EBUSY) {
+#ifdef PROTO_DEBUG
 					fprintf(stderr, "%d: mutex lock error: %s\n",
 						__LINE__, strerror(errno));
+#endif
 					goto error;
 				}
 
@@ -175,8 +179,10 @@ void *handle_connection(void *_con) {
 			ret = pthread_mutex_trylock(&con->out_mutex);
 			if(ret != 0) {
 				if(ret != EBUSY) {
+#ifdef PROTO_DEBUG
 					fprintf(stderr, "%d: mutex lock error: %s\n",
 						__LINE__, strerror(errno));
+#endif
 					goto error;
 				}
 
@@ -328,7 +334,9 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 		received = read_bytes(con->sockfd, buf, 8, 0, 10000ULL);
 		IO_CHECK(received, 8);
 		if(ack_map_rm(map, decbe64(buf)) == -1) {
+#ifdef PROTO_DEBUG
 			fprintf(stderr, "ack_map doesn't contain key\n");
+#endif
 			errno = EINVAL;
 			goto error;
 		}
@@ -388,7 +396,9 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 #endif
 		break;
 	default:
+#ifdef PROTO_DEBUG
 		fprintf(stderr, "invalid type value: %llu\n", (uint64_t)type);
+#endif
 		errno = EINVAL;
 		goto error;
 	}
@@ -419,16 +429,20 @@ static ssize_t send_bytes(int fd, void *buf, size_t len, int flags, uint64_t tim
 		wait.tv_usec = WAIT_TIMEOUT < timeout ? WAIT_TIMEOUT : timeout;
 
 		if(select(FD_SETSIZE, NULL, &wset, NULL, &wait) == -1) {
+#ifdef PROTO_DEBUG
 			fprintf(stderr, "%d: select error: %s\n", __LINE__,
 				strerror(errno));
+#endif
 			goto error;
 		}
 
 		written = send(fd, &buf[total], len - total, flags | MSG_DONTWAIT);
 		if(written == -1) {
 			if(errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+#ifdef PROTO_DEBUG
 				fprintf(stderr, "%d: socket write error: %s\n",
 					__LINE__, strerror(errno));
+#endif
 				goto error;
 			}
 			goto loopend;
@@ -465,16 +479,20 @@ static ssize_t read_bytes(int fd, void *buf, size_t len, int flags, uint64_t tim
 		wait.tv_usec = WAIT_TIMEOUT < timeout ? WAIT_TIMEOUT : timeout;
 
 		if(select(FD_SETSIZE, &rset, NULL, NULL, &wait) == -1) {
+#ifdef PROTO_DEBUG
 			fprintf(stderr, "%d: select error: %s\n", __LINE__,
 				strerror(errno));
+#endif
 			goto error;
 		}
 
 		received = recv(fd, &buf[total], len - total, flags | MSG_DONTWAIT);
 		if(received == -1) {
 			if(errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
+#ifdef PROTO_DEBUG
 				fprintf(stderr, "%d: socket read error: %s\n",
 					__LINE__, strerror(errno));
+#endif
 				goto error;
 			}
 			goto loopend;
