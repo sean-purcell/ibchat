@@ -29,5 +29,8 @@ struct message *message_queue_top(struct message_queue *queue);
 struct message *message_queue_pop(struct message_queue *queue);
 int message_queue_push(struct message_queue *queue, struct message *message);
 
+struct message *alloc_message(uint64_t size);
+void free_message(struct message *m);
+
 #endif
 

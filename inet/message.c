@@ -56,3 +56,25 @@ int message_queue_push(struct message_queue *queue, struct message *message) {
 	return 0;
 }
 
+struct message *alloc_message(uint64_t size) {
+	errno = ENOMEM;
+
+	struct message *m;
+	if((m = malloc(sizeof(struct message))) == NULL) {
+		return NULL;
+	}
+
+	if((m->message = malloc(size)) == NULL) {
+		free(m);
+		return NULL;
+	}
+
+	errno = 0;
+	return m;
+}
+
+void free_message(struct message *m) {
+	free(m->message);
+	free(m);
+}
+

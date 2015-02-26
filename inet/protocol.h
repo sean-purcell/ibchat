@@ -23,5 +23,8 @@ void end_handler(struct con_handle *con);
 void init_handler(struct con_handle *con, int sockfd);
 void destroy_handler(struct con_handle *con);
 
+struct message *get_message(struct con_handle *con, uint64_t timeout);
+void add_message(struct con_handle *con, struct message *m);
+
 #endif
 

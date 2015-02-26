@@ -42,29 +42,24 @@ int main(int argc, char **argv) {
 	pthread_create(&handler, NULL, handle_connection, &con);
 
 	uint32_t ctr = 0;
-	struct message m;
-	m.message = malloc(256);
 	while(handler_status(&con) == 0) {
-		pthread_mutex_lock(&con.in_mutex);
-		if(con.in_queue.size > 0) {
-			struct message *in = message_queue_pop(&con.in_queue);
-			printf("%llu: %s\n", in->seq_num, in->message);
+		struct message *in = get_message(&con, 0);
+		if(in == NULL) continue;
+		printf("%llu: %s\n", in->seq_num, in->message);
+		int a = atoi((char*)in->message);
+		struct message *out = alloc_message(256);
+		sprintf((char*)out->message, "%d", a + 1);
+		out->seq_num = ctr;
+		out->length = strlen((char*)out->message) + 1;
 
-			int a = atoi((char*)in->message);
-			sprintf((char*)m.message, "%d", a + 1);
-			m.seq_num = ctr;
-			m.length = strlen((char*)m.message) + 1;
+		add_message(&con, out);
 
-			pthread_mutex_lock(&con.out_mutex);
-			message_queue_push(&con.out_queue, &m);
-			pthread_mutex_unlock(&con.out_mutex);
-			ctr++;
+		ctr++;
 
-			if(a > 256) end_handler(&con);
-		}
+		if(a > 256) end_handler(&con);
 		pthread_mutex_unlock(&con.in_mutex);
 
-		usleep(500000);
+		usleep(50000);
 	}
 
 	destroy_handler(&con);

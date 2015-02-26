@@ -103,6 +103,37 @@ void destroy_handler(struct con_handle *con) {
 	pthread_mutex_destroy(&con->kill_mutex);
 }
 
+struct message *get_message(struct con_handle *con, uint64_t timeout) {
+	struct timeval start, now;
+	gettimeofday(&start, NULL);
+	now = start;
+	uint64_t waittime = timeout < WAIT_TIMEOUT ? timeout : WAIT_TIMEOUT;
+	struct message *m = NULL;
+	while(handler_status(con) == 0 &&
+		(timeout == 0 || utime(now) - utime(start) < timeout)) {
+		pthread_mutex_lock(&con->in_mutex);
+		if(con->in_queue.size > 0) {
+			m = message_queue_pop(&con->in_queue);
+
+			goto exit;
+		}
+		pthread_mutex_unlock(&con->in_mutex);
+		usleep(waittime);
+
+		gettimeofday(&now, NULL);
+	}
+
+	errno = ETIME;
+exit:
+	return m;
+}
+
+void add_message(struct con_handle *con, struct message *m) {
+	pthread_mutex_lock(&con->out_mutex);
+	message_queue_push(&con->out_queue, m);
+	pthread_mutex_unlock(&con->out_mutex);
+}
+
 static void handler_cleanup(void *_con) {
 	struct con_handle *con = ((struct con_handle *) _con);
 	end_handler(con);
@@ -301,6 +332,7 @@ static int write_messages(struct con_handle *con, struct ack_map *map) {
 		}
 
 		message_queue_pop(&con->out_queue);
+		free_message(next_message);
 
 #ifdef PROTO_DEBUG
 		printf("%llu sent\n", next_message->seq_num);
@@ -322,6 +354,7 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 	uint32_t type;
 
 	struct message *in_message;
+	uint64_t seq_num, length;
 
 	struct timeval now;
 
@@ -352,24 +385,20 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 #endif
 		break;
 	case 2: /* new message */
-		in_message = malloc(sizeof(struct message));
-		if(in_message == NULL) {
-			errno = ENOMEM;
-			goto error;
-		}
+		received = read_bytes(con->sockfd, buf, 8, 0, 10000ULL);
+		IO_CHECK(received, 8);
+		seq_num = decbe64(buf);
 
 		received = read_bytes(con->sockfd, buf, 8, 0, 10000ULL);
 		IO_CHECK(received, 8);
-		in_message->seq_num = decbe64(buf);
+		length = decbe64(buf);
 
-		received = read_bytes(con->sockfd, buf, 8, 0, 10000ULL);
-		IO_CHECK(received, 8);
-		in_message->length = decbe64(buf);
-
-		if((in_message->message = malloc(in_message->length)) == NULL) {
-			errno = ENOMEM;
+		if((in_message = alloc_message(length)) == NULL) {
 			goto error;
 		}
+
+		in_message->seq_num = seq_num;
+		in_message->length = length;
 
 		received = read_bytes(con->sockfd, in_message->message,
 			in_message->length, 0, 50000ULL);
