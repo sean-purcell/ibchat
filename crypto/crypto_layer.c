@@ -6,8 +6,9 @@
 #include <ibcrypt/sha256.h>
 
 #include <libibur/util.h>
+#include <libibur/endian.h>
 
-#include "../util/message.h"
+#include "../inet/message.h"
 
 #include "crypto_layer.h"
 
@@ -22,10 +23,10 @@ struct message *encrypt_message(struct keyset *keys, uint8_t *ptext, uint64_t pl
 	}
 
 	m->length = length;
-	m->seq_num = nonce;
+	m->seq_num = keys->nonce;
 
-	encbe64(nonce, m->message);
-	if(chacha_enc(keys->send_symm_key, 32, nonce, ptext, &m->message[8], plen) != 0) {
+	encbe64(keys->nonce, m->message);
+	if(chacha_enc(keys->send_symm_key, 32, keys->nonce, ptext, &m->message[8], plen) != 0) {
 		free_message(m);
 		return NULL;
 	}
@@ -44,7 +45,7 @@ int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out) {
 		return -1;
 	}
 
-	uint32_t mac[32];
+	uint8_t mac[32];
 	uint64_t plen = m->length - 32 - 8;
 	uint64_t nonce;
 
@@ -58,7 +59,7 @@ int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out) {
 
 	nonce = decbe64(m->message);
 
-	if(chacha_dec(keys->recv_symm_key, 32, nonce, &m->message[8], plen, out) != 0) {
+	if(chacha_dec(keys->recv_symm_key, 32, nonce, &m->message[8], out, plen) != 0) {
 		return -1;
 	}
 
