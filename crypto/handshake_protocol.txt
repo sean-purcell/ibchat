@@ -3,9 +3,11 @@ first message
 server->client
 
 this protocol assumes 2048-bit rsa keys are used
+all hashes are sha256
 
 0x000-0x210 rsa public key, in form specified by ibcrypt
-0x210-0x310 signature of public key hash by one of the trust anchors
+0x210-0x420 rsa public key of trust anchor for the key
+0x420-0x520 signature of public key by one of the trust anchors
 
 client->server
 0x000-0x100 key set, encrypted with the received public key

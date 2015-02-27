@@ -3,4 +3,5 @@ message protocol
 
 0x00-0x08   nonce
 0x08-X      message
+X-X+0x32    hmac for message including nonce
 

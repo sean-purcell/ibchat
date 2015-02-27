@@ -3,6 +3,9 @@
 #include <errno.h>
 
 #include <ibcrypt/chacha.h>
+#include <ibcrypt/sha256.h>
+
+#include <libibur/util.h>
 
 #include "../util/message.h"
 
@@ -10,34 +13,55 @@
 
 /* encrypts the given message using 256-bit chacha */
 /* returns NULL in the case of failure */
-struct message *encrypt_message(uint8_t key[32], uint64_t nonce, uint8_t *ptext, uint64_t len) {
-	struct message *m = malloc(sizeof(struct message));
+struct message *encrypt_message(struct keyset *keys, uint8_t *ptext, uint64_t plen) {
+	uint64_t length = 8 + plen + 32; /* message plus hmac */
+
+	struct message *m = alloc_message(length);
 	if(m == NULL) {
-		errno = ENOMEM;
 		return NULL;
 	}
 
-	m->message = malloc(len);
-	if(m->message == NULL) {
-		errno = ENOMEM;
-		return NULL;
-	}
-
-	m->len = len;
+	m->length = length;
 	m->seq_num = nonce;
 
-	if(chacha_enc(key, 32, nonce, ptext, m->message, len) != 0) {
-		free(m->message);
-		free(m);
+	encbe64(nonce, m->message);
+	if(chacha_enc(keys->send_symm_key, 32, nonce, ptext, &m->message[8], plen) != 0) {
+		free_message(m);
 		return NULL;
 	}
+	hmac_sha256(keys->send_hmac_key, 32, m->message, plen + 8, &m->message[8 + plen]);
+
+	keys->nonce++;
 
 	return m;
 }
 
 /* decrypts the given message using 256-bit chacha */
 /* returns non-zero in case of failure */
-int decrypt_message(uint8_t key[32], struct message *m, uint8_t *out) {
-	return chacha_dec(key, 32, m->seq_num, m->message, out, m->length);
+int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out) {
+	if(m->length < 32) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	uint32_t mac[32];
+	uint64_t plen = m->length - 32 - 8;
+	uint64_t nonce;
+
+	hmac_sha256(keys->recv_hmac_key, 32, m->message, 8 + plen, mac);
+
+	uint8_t res = memcmp_ct(mac, &m->message[8 + plen], 32);
+	if(res != 0) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	nonce = decbe64(m->message);
+
+	if(chacha_dec(keys->recv_symm_key, 32, nonce, &m->message[8], plen, out) != 0) {
+		return -1;
+	}
+
+	return 0;
 }
 
