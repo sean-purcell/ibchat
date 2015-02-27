@@ -294,7 +294,14 @@ static int write_messages(struct con_handle *con, struct ack_map *map) {
 	uint8_t hash[32];
 	ssize_t written;
 	ssize_t total;
-	while(con->out_queue.size > 0) {
+
+	struct timeval tv;
+	uint64_t start;
+
+	gettimeofday(&tv, NULL);
+	start = utime(tv);
+
+	while(con->out_queue.size > 0 && utime(tv) - start < ACK_WAITTIME / 2) {
 		struct message *next_message = message_queue_top(&con->out_queue);
 
 		/* calculate sha256 hash */
@@ -337,6 +344,7 @@ static int write_messages(struct con_handle *con, struct ack_map *map) {
 #ifdef PROTO_DEBUG
 		printf("%llu sent\n", next_message->seq_num);
 #endif
+		gettimeofday(&tv, NULL);
 	}
 
 exit:

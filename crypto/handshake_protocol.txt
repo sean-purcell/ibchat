@@ -19,8 +19,7 @@ key set:
 0x060-0x080 server hmac key
 
 server->client
-0x000-0x020 hash of key set encrypted with server->client key
-0x020-0x040 hmac signature of above encrypted hash with server hmac key
+encrypted hash of the keybuf, according to the crypto layer protocol
 
 once this is complete, they are connected, and may communicate according to the
 ibchat application layer protocol

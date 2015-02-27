@@ -39,14 +39,14 @@ struct message *encrypt_message(struct keyset *keys, uint8_t *ptext, uint64_t pl
 
 /* decrypts the given message using 256-bit chacha */
 /* returns non-zero in case of failure */
-int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out) {
-	if(m->length < 32) {
+int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out, uint64_t outlen) {
+	if(m->length < 40 || m->length > outlen + 40) {
 		errno = EINVAL;
 		return -1;
 	}
 
 	uint8_t mac[32];
-	uint64_t plen = m->length - 32 - 8;
+	uint64_t plen = m->length - 40; /* 32 for mac and 8 for nonce */
 	uint64_t nonce;
 
 	hmac_sha256(keys->recv_hmac_key, 32, m->message, 8 + plen, mac);
@@ -54,7 +54,7 @@ int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out) {
 	uint8_t res = memcmp_ct(mac, &m->message[8 + plen], 32);
 	if(res != 0) {
 		errno = EINVAL;
-		return -1;
+		return 1;
 	}
 
 	nonce = decbe64(m->message);
@@ -64,5 +64,27 @@ int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out) {
 	}
 
 	return 0;
+}
+
+/* type: 0=client, 1=server */
+void expand_keyset(uint8_t *keybuf, int type, struct keyset *keys) {
+	switch(type) {
+	case 0:
+		memcpy(keys->send_symm_key, &keybuf[0x00], 0x20);
+		memcpy(keys->recv_symm_key, &keybuf[0x20], 0x20);
+		memcpy(keys->send_hmac_key, &keybuf[0x40], 0x20);
+		memcpy(keys->recv_hmac_key, &keybuf[0x60], 0x20);
+		break;
+	case 1:
+		memcpy(keys->recv_symm_key, &keybuf[0x00], 0x20);
+		memcpy(keys->send_symm_key, &keybuf[0x20], 0x20);
+		memcpy(keys->recv_hmac_key, &keybuf[0x40], 0x20);
+		memcpy(keys->send_hmac_key, &keybuf[0x60], 0x20);
+		break;
+	default:
+		/* bad */
+		errno = EINVAL;
+		break;
+	}
 }
 

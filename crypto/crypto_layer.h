@@ -19,7 +19,8 @@ struct connection {
 };
 
 struct message *encrypt_message(struct keyset *keys, uint8_t *ptext, uint64_t plen);
-int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out);
+int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out, uint64_t outlen);
+void expand_keyset(uint8_t *keybuf, int type, struct keyset *keys);
 
 #endif
 

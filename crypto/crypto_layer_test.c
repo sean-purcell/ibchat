@@ -19,16 +19,10 @@ int main() {
 		return -1;
 	}
 
-	memcpy(skey.send_symm_key, &keybuf[0x00], 0x20);
-	memcpy(skey.recv_symm_key, &keybuf[0x20], 0x20);
-	memcpy(skey.send_hmac_key, &keybuf[0x40], 0x20);
-	memcpy(skey.recv_hmac_key, &keybuf[0x60], 0x20);
+	expand_keyset(keybuf, 0, &skey);
 	skey.nonce = 0;
-	memcpy(rkey.send_symm_key, &keybuf[0x20], 0x20);
-	memcpy(rkey.recv_symm_key, &keybuf[0x00], 0x20);
-	memcpy(rkey.send_hmac_key, &keybuf[0x60], 0x20);
-	memcpy(rkey.recv_hmac_key, &keybuf[0x40], 0x20);
-	skey.nonce = 0;
+	expand_keyset(keybuf, 1, &rkey);
+	rkey.nonce = 0;
 
 	char *secret = "this is my secret.  there are many like it, but this one is mine.";
 	struct message *m = encrypt_message(&skey, (uint8_t*)secret, strlen(secret) + 1);
@@ -42,7 +36,7 @@ int main() {
 	printbuf(m->message, m->length);
 
 	char out[256];
-	int ret = decrypt_message(&rkey, m, (uint8_t*)out);
+	int ret = decrypt_message(&rkey, m, (uint8_t*)out, 256);
 	free_message(m);
 	printf("%d\n", ret);
 	printf("%s\n", out);
@@ -57,12 +51,12 @@ int main() {
 
 	printbuf(m->message, m->length);
 
-	ret = decrypt_message(&rkey, m, (uint8_t*)out);
+	ret = decrypt_message(&rkey, m, (uint8_t*)out, 256);
 	printf("%d\n", ret);
 	printf("%s\n", out);
 
 	m->message[15] ^= 0x4;
-	ret = decrypt_message(&rkey, m, (uint8_t*)out);
+	ret = decrypt_message(&rkey, m, (uint8_t*)out, 256);
 	printf("%d\n", ret);
 }
 
