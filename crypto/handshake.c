@@ -29,11 +29,11 @@ int server_handshake(struct connection *con, RSA_KEY *prikey, struct cert server
 	if((cert_m = alloc_message(server_cert.size)) == NULL) {
 		return -1;
 	}
-	
+
 	memcpy(cert_m->message, server_cert.cert, server_cert.size);
 	cert_m->length = server_cert.size;
 	cert_m->seq_num = 0; /* first message in the sequence */
-	
+
 	add_message(con, cert_m);
 	cert_m = NULL; /* don't hang on to invalid pointer */
 
@@ -199,6 +199,7 @@ valid_anchor:
 	free_message(challenge_m);
 	challenge_m = NULL;
 
+	/* don't bother failing early if the MAC failed */
 	ret |= memcmp_ct(hash, challenge_response, hlen);
 	if(ret) {
 		*res = BAD_CHALLENGE_RESP;	

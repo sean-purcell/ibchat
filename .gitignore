@@ -2,4 +2,6 @@
 a.out
 *.dSYM
 .*.sw*
+*.pri
+*.pub
 
