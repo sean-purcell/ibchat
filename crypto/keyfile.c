@@ -20,7 +20,7 @@ int write_pri_key(RSA_KEY *key, const char *filename) {
 
 	buf = malloc(size);
 	if(buf == NULL) {
-		return MALLOC_FAIL;
+		return MEM_FAIL;
 	}
 
 	if(rsa_prikey2wire(key, buf, size) != 0) {
@@ -59,7 +59,7 @@ int write_pub_key(RSA_PUBLIC_KEY *key, const char *filename) {
 
 	buf = malloc(size);
 	if(buf == NULL) {
-		return MALLOC_FAIL;
+		return MEM_FAIL;
 	}
 
 	if(rsa_pubkey2wire(key, buf, size) != 0) {
@@ -97,8 +97,8 @@ int read_pri_key(const char *filename, RSA_KEY *key) {
 
 	int ret = 0;
 
-	out = fopen(filename, "rb");
-	if(out == NULL) {
+	in = fopen(filename, "rb");
+	if(in == NULL) {
 		return OPEN_FAIL;
 	}
 
@@ -112,7 +112,7 @@ int read_pri_key(const char *filename, RSA_KEY *key) {
 
 	buf = malloc(size);
 	if(buf == NULL) {
-		ret = MALLOC_FAIL;
+		ret = MEM_FAIL;
 		goto err;
 	}
 
@@ -120,6 +120,7 @@ int read_pri_key(const char *filename, RSA_KEY *key) {
 
 	read = fread(&buf[8], 1, size - 8, in);
 	fclose(in);
+	in = NULL;
 
 	if(read != size - 8) {
 		ret = READ_FAIL;
@@ -134,12 +135,13 @@ int read_pri_key(const char *filename, RSA_KEY *key) {
 	return 0;
 
 err:
+	if(in)  fclose(in);
 	if(buf) zfree(buf, size);
 
 	return ret;
 }
 
-int read_pub_key(const char *filename, RSA_PUBLIC_KEy *pkey) {
+int read_pub_key(const char *filename, RSA_PUBLIC_KEY *key) {
 	uint8_t size_buf[8];
 	uint8_t *buf = NULL;
 	size_t size, read;
@@ -147,8 +149,8 @@ int read_pub_key(const char *filename, RSA_PUBLIC_KEy *pkey) {
 
 	int ret = 0;
 
-	out = fopen(filename, "rb");
-	if(out == NULL) {
+	in = fopen(filename, "rb");
+	if(in == NULL) {
 		return OPEN_FAIL;
 	}
 
@@ -162,7 +164,7 @@ int read_pub_key(const char *filename, RSA_PUBLIC_KEy *pkey) {
 
 	buf = malloc(size);
 	if(buf == NULL) {
-		ret = MALLOC_FAIL;
+		ret = MEM_FAIL;
 		goto err;
 	}
 
@@ -170,6 +172,7 @@ int read_pub_key(const char *filename, RSA_PUBLIC_KEy *pkey) {
 
 	read = fread(&buf[8], 1, size - 8, in);
 	fclose(in);
+	in = NULL;
 
 	if(read != size - 8) {
 		ret = READ_FAIL;
@@ -184,6 +187,7 @@ int read_pub_key(const char *filename, RSA_PUBLIC_KEy *pkey) {
 	return 0;
 
 err:
+	if(in)  fclose(in);
 	if(buf) zfree(buf, size);
 
 	return ret;

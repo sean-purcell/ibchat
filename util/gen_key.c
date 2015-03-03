@@ -9,11 +9,16 @@
 #include <ibcrypt/rsa_util.h>
 #include <ibcrypt/bignum.h>
 
-int main(int argc, char **argv) {
-	if(argc != 3 && argc != 4) {
-		fprintf(stderr, "usage: %s <outfile (no extension)> <bits> [public exponent]\n", argv[0]);
+#include "../crypto/keyfile.h"
+
+int gen_key(int argc, char **argv) {
+	if(argc != 4 && argc != 5) {
+		fprintf(stderr, "usage: %s %s <outfile (no extension)> <bits> [public exponent]\n",
+			argv[0], argv[1]);
 		return 1;
 	}
+
+	argc--; argv++;
 
 	uint64_t bits = strtoull(argv[2], NULL, 0);
 	uint64_t exp = 65537;
@@ -37,89 +42,46 @@ int main(int argc, char **argv) {
 
 	RSA_KEY key;
 	RSA_PUBLIC_KEY pkey;
-	uint8_t *key_bin = NULL;
-	uint8_t *pkey_bin = NULL;
-	FILE *key_out;
-	FILE *pkey_out;
 	char *filename = NULL;
-	size_t written;
-	size_t total;
+	size_t fname_size;
 
 	int ret;
-	int e = 0;
 
 	if((ret = rsa_gen_key(&key, bits, exp)) != 0) {
-		goto egen;
+		goto err;
 	}
 
 	if((ret = rsa_pub_key(&key, &pkey)) != 0) {
-		goto epub;
+		goto err;
 	}
 
 	fprintf(stderr, "key generated\n");
 
-	key_bin = malloc(rsa_prikey_bufsize(bits));
-	pkey_bin = malloc(rsa_pubkey_bufsize(bits));
+	fname_size = strlen(argv[1]);
 
-	if(key_bin == NULL || pkey_bin == NULL) {
-		errno = ENOMEM;
-		goto emalloc;
-	}
-
-	if(rsa_prikey2wire(&key, key_bin, rsa_prikey_bufsize(bits)) != 0) {
-		goto econvert;
-	}
-
-	if(rsa_pubkey2wire(&pkey, pkey_bin, rsa_pubkey_bufsize(bits)) != 0) {
-		goto econvert;
-	}
-
-	filename = malloc(strlen(argv[1]) + 4);
+	filename = malloc(fname_size + 5);
 	if(filename == NULL) {
 		errno = ENOMEM;
-		goto efname;
+		goto err;
 	}
 
-	if(strcmp(argv[1], "--") == 0) {
-		key_out = stdout;
-		pkey_out = NULL;
-	} else {
-		memcpy(filename, argv[1], strlen(argv[1]));
-		memcpy(&filename[strlen(argv[1])], ".pri", 5);
-		key_out = fopen(filename, "wb");
-		if(key_out == NULL) {
-			goto eopri;
-		}
+	memcpy(filename, argv[1], fname_size);
 
-		memcpy(&filename[strlen(argv[1])], ".pub", 5);
-		pkey_out = fopen(filename, "wb");
-		if(pkey_out == NULL) {
-			goto eopub;
-		}
+	memcpy(&filename[fname_size], ".pri", 5);
+	ret = write_pri_key(&key, filename);
+	if(ret != 0) {
+		goto err;
 	}
 
-	total = rsa_prikey_bufsize(bits);
-	written = fwrite(key_bin, 1, total, key_out);
-	if(written != total) {
-		goto ewrite;
-	}
-
-	if(pkey_out != NULL) {
-		total = rsa_pubkey_bufsize(bits);
-		written = fwrite(pkey_bin, 1, total, pkey_out);
-		if(written != total) {
-			goto ewrite;
-		}
+	memcpy(&filename[fname_size], ".pub", 5);
+	ret = write_pub_key(&pkey, filename);
+	if(ret != 0) {
+		goto err;
 	}
 
 	fprintf(stderr, "private key written to %s.pri\n"
 	        "public key written to %s.pub\n", argv[1], argv[1]);
 
-	fclose(key_out);
-	if(!pkey_out) fclose(pkey_out);
-
-	free(key_bin);
-	free(pkey_bin);
 	free(filename);
 
 	memset(&key, 0, sizeof(RSA_KEY));
@@ -127,30 +89,21 @@ int main(int argc, char **argv) {
 
 	return 0;
 
-ewrite:
-	if(!e) fprintf(stderr, "error writing files\n");
-	e = 1;
-eopub:
-	fclose(key_out);
-eopri:
-	free(filename);
-	if(!e) fprintf(stderr, "error opening files\n");
-	e = 1;
-efname:
-	if(!e) fprintf(stderr, "error allocating memory\n");
-	e = 1;
-econvert:
-	free(pkey_bin);
-	free(key_bin);
-	if(!e) fprintf(stderr, "error converting to wire format\n");
-	e = 1;
-emalloc:
-	if(!e) fprintf(stderr, "error allocating memory\n");
-	e = 1;
-epub:
-egen:
-	if(!e) fprintf(stderr, "cryptography error\n");
-	e = 1;
+	int e = 0;
+err:;
+	char *estr = NULL;
+	switch(ret) {
+	case MEM_FAIL:
+		estr = "failed to allocate memory\n"; break;
+	case CRYPTOGRAPHY_FAIL:
+		estr = "a cryptography error occurred\n"; break;
+	case OPEN_FAIL:
+		estr = "failed to open file\n"; break;
+	case WRITE_FAIL:
+		estr = "failed to write to file\n"; break;
+	}
+	fprintf(stderr, "%s", estr);
+
 	memset(&key, 0, sizeof(RSA_KEY));
 	memset(&pkey, 0, sizeof(RSA_PUBLIC_KEY));
 
