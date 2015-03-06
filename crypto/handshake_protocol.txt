@@ -1,5 +1,5 @@
-first message
-=============
+handshake protocol
+==================
 this protocol assumes 2048-bit rsa and diffie-hellman keys are used
 group 14 as identified in rfc3526 is used for key exchange
 the keyset is obtained using pbkdf2_hmac_sha256
