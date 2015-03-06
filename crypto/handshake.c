@@ -1,8 +1,17 @@
-#include <time.h>
+#include <stdlib.h>
 
+#include <sys/time.h>
+
+#include <ibcrypt/dh.h>
+#include <ibcrypt/dh_util.h>
 #include <ibcrypt/rsa.h>
-#include <ibcrypt/rsa_util.h>
 #include <ibcrypt/rsa_err.h>
+#include <ibcrypt/rsa_util.h>
+#include <ibcrypt/sha256.h>
+#include <ibcrypt/zfree.h>
+
+#include <libibur/util.h>
+#include <libibur/endian.h>
 
 #include "handshake.h"
 #include "crypto_layer.h"
@@ -10,8 +19,9 @@
 #include "../inet/protocol.h"
 
 /* don't import the whole file just for this */
-uint64_t utime(struct timeval tv);
+extern uint64_t utime(struct timeval tv);
 
+#ifdef NOT_IMPL
 int server_handshake(struct connection *con, RSA_KEY *prikey, struct cert server_cert, struct keyset *keys) {
 	struct message *cert_m;
 	struct message *keyset_m;
@@ -20,7 +30,7 @@ int server_handshake(struct connection *con, RSA_KEY *prikey, struct cert server
 	const uint64_t total_time = 5000000ULL;
 
 	const size_t key_size = 128;
-	uint8_t keybuf[keybuf_size];
+	uint8_t keybuf[key_size];
 
 	const size_t hlen = 32;
 	uint8_t hash[hlen];
@@ -65,12 +75,13 @@ int server_handshake(struct connection *con, RSA_KEY *prikey, struct cert server
 	/* we're done the handshake */
 	return 0;
 }
+#endif
 
 /* res indicates the results.  it is 0 if everything worked out fine, other
  * values are defined in the header
  * program failures have a return value of -1,
  * invalid states have a positive return value */
-int client_handshake(struct connection *con, RSA_PUB_KEY *server_rsa_key, struct *keyset keys, int *res) {
+int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, struct keyset *keys, int *res) {
 	/* measure our starting time, we allow maximum 5 seconds for this */
 	struct timeval tv;
 	uint64_t start;
@@ -135,37 +146,16 @@ int client_handshake(struct connection *con, RSA_PUB_KEY *server_rsa_key, struct
 
 	/* wait for the response */
 	gettimeofday(&tv, NULL);
-	server_m = get_message(con, total_time - (utime(now) - start));
+	server_m = get_message(con, total_time - (utime(tv) - start));
 	if(server_m == NULL) {
 		return -1;
 	}
 
-	cert = &server_m->message[8];
-	cert_size = decbe64(server_m->message);
+	rsa_sk = &server_m->message[8];
+	rsa_sk_size = decbe64(&server_m[0]);
 
-	ret = cert_verify(cert, cert_size, server_key, anchor_key, hash);
-	if(ret == -1) {
-		return -1;
-	} else if(ret == 1) {
-		/* we don't have a valid cert */
-		*res = INVALID_SIG;
-		return 1;
-	}
-
-	for(i = 0; i < num_anchors; i++) {
-		if(!memcmp_ct(anchors[i], hash, hlen)) {
-			/* we have a match */
-			goto valid_anchor;
-		}
-	}
-
-	/* we found no valid anchor */
-	/* continue with the negotiation, let the client decide what to do */
-	*res = NON_TRUSTED_ROOT;
-valid_anchor:
-
-	dh_sk = &server_m->message[16 + cert_size];
-	dh_sk_size = decbe64(&server_m->message[8 + cert_size]);
+	dh_sk = &server_m->message[16 + rsa_sk_size];
+	dh_sk_size = decbe64(&server_m->message[8 + rsa_sk_size]);
 
 	if(dh_sk_size > (dh_ctx.bits + 7) / 8) {
 		*res = INVALID_DH_KEY;
@@ -211,7 +201,7 @@ valid_anchor:
 	keys->nonce = 1;
 
 	/* hash the keybuf */
-	sha256(keybuf, 128, hash);
+	sha256(key_buf, 128, hash);
 
 	ret = memcmp_ct(hash, &server_m->message[8 + rsa_sk_size + 8 + dh_sk_size],
 		hlen);

@@ -16,8 +16,5 @@ struct cert {
 	uint8_t *cert;
 };
 
-int server_handshake(struct connection *con, struct cert server_cert);
-int client_handshake(struct connection *con, struct cert server_cert);
-
 #endif
 
