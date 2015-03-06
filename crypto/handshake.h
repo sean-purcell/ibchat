@@ -7,11 +7,9 @@
 
 #include "../inet/protocol.h"
 
-/* this is the only one that's acceptable, and even then not great */
-#define NON_TRUSTED_ROOT 1
-
-#define INVALID_SIG 2
-#define BAD_CHALLENGE_RESP 3
+#define INVALID_SIG        1
+#define INVALID_DH_KEY     2
+#define INVALID_KEY_HASH   3
 
 struct cert {
 	uint64_t size;

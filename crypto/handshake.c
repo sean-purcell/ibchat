@@ -70,28 +70,37 @@ int server_handshake(struct connection *con, RSA_KEY *prikey, struct cert server
  * values are defined in the header
  * program failures have a return value of -1,
  * invalid states have a positive return value */
-int client_handshake(struct connection *con, uint8_t **anchors, size_t num_anchors, RSA_PUB_KEY *server_key, RSA_PUB_KEY *anchor_key, struct *keyset keys, int *res) {
+int client_handshake(struct connection *con, RSA_PUB_KEY *server_rsa_key, struct *keyset keys, int *res) {
 	/* measure our starting time, we allow maximum 5 seconds for this */
 	struct timeval tv;
 	uint64_t start;
 
 	const uint64_t total_time = 5000000ULL;
 
-	struct message *cert_m;
-	struct message *keyset_m;
-	struct message *challenge_m;
+	struct message *client_m;
+	struct message *server_m;
 
 	const size_t key_size = 128;
-	uint8_t keybuf[keybuf_size];
+	uint8_t key_buf[key_size];
 
 	const size_t hlen = 32;
 	uint8_t hash[hlen];
-	uint8_t challenge_response[hlen];
 
-	uint64_t server_key_size;
-	uint64_t anchor_key_size;
+	uint8_t *rsa_sk;
+	uint64_t rsa_sk_size;
+	uint8_t *dh_sk;
+	uint64_t dh_sk_size;
+
+	DH_CTX dh_ctx;
+	DH_PUB dh_server_key = DH_VAL_INIT;
+	DH_PUB dh_public_key = DH_VAL_INIT;
+	DH_PRI dh_priv_exp = DH_VAL_INIT;
+	DH_VAL dh_secret = DH_VAL_INIT;
+
+	uint8_t *dh_secret_buf;
+	uint64_t dh_secret_size;
+
 	uint64_t sig_offset;
-	size_t i;
 
 	int ret;
 
@@ -100,51 +109,48 @@ int client_handshake(struct connection *con, uint8_t **anchors, size_t num_ancho
 	gettimeofday(&tv, NULL);
 	start = utime(tv);
 
-	/* wait for the cert message */
-	cert_m = get_message(con, total_time);
-	if(cert_m == NULL) {
+	/* initialize our DH context */
+	if(dh_init_ctx(&dh_ctx, 14) != 0) {
+		return -1;
+	}
+	if(dh_gen_exp(&dh_ctx, &dh_priv_exp) != 0) {
+		return -1;
+	}
+	if(dh_gen_pub(&dh_ctx, &dh_priv_exp, &dh_public_key) != 0) {
 		return -1;
 	}
 
-	/* verify the cert message */
-	server_key_size = rsa_pubkey_bufsize(decbe64(cert_m->message));
-	anchor_key_size = rsa_pubkey_bufsize(decbe64(&cert_m->message[server_key_size]));
-	sig_offset = server_key_size + anchor_key_size;
-	if(sig_offset > cert_m->length) {
+	/* send the public key message */
+	client_m = alloc_message(dh_valwire_bufsize(&dh_public_key));
+	if(client_m == NULL) {
 		return -1;
 	}
 
-	/* expand the server key into its public key form */
-	if(rsa_wire2pubkey(&cert_m->message[0], server_key_size,
-		server_key) == 0) {
-		return -1;
-	}
-	/* expand the anchor key into its public key form */
-	if(rsa_wire2pubkey(&cert_m->message[server_key_size], anchor_key_size,
-		anchor_key) == 0) {
+	if(dh_val2wire(&dh_public_key, client_m->message, client_m->length) != 0) {
 		return -1;
 	}
 
-	/* verify the signature */
-	int valid = 0;
-	if((ret = rsa_pss_verify(anchor_key_size, &cert_m->message[sig_offset],
-		cert_m->length - sig_offset, &cert_m->message[0], server_key_size,
-		&valid)) != 0) {
-		if(ret == MALLOC_FAIL) {
-			errno = ENOMEM;
-		} else if(ret == CRYPTOGRAPHY_FAIL) {
-			errno = EINVAL;
-		}
+	add_message(con, client_m);
+	client_m = NULL;
+
+	/* wait for the response */
+	gettimeofday(&tv, NULL);
+	server_m = get_message(con, total_time - (utime(now) - start));
+	if(server_m == NULL) {
 		return -1;
 	}
-	if(!valid) {
+
+	cert = &server_m->message[8];
+	cert_size = decbe64(server_m->message);
+
+	ret = cert_verify(cert, cert_size, server_key, anchor_key, hash);
+	if(ret == -1) {
+		return -1;
+	} else if(ret == 1) {
 		/* we don't have a valid cert */
 		*res = INVALID_SIG;
 		return 1;
 	}
-
-	/* hash the anchor, see if we have it */
-	sha256(&cert_m->message[server_key_size], anchor_key_size, hash);
 
 	for(i = 0; i < num_anchors; i++) {
 		if(!memcmp_ct(anchors[i], hash, hlen)) {
@@ -156,55 +162,96 @@ int client_handshake(struct connection *con, uint8_t **anchors, size_t num_ancho
 	/* we found no valid anchor */
 	/* continue with the negotiation, let the client decide what to do */
 	*res = NON_TRUSTED_ROOT;
-
 valid_anchor:
-	/* we're done with that message */
-	free_message(cert_m);
 
-	/* generate the keys */
-	if(cs_rand(keybuf, key_size) != 0) {
+	dh_sk = &server_m->message[16 + cert_size];
+	dh_sk_size = decbe64(&server_m->message[8 + cert_size]);
+
+	if(dh_sk_size > (dh_ctx.bits + 7) / 8) {
+		*res = INVALID_DH_KEY;
+		return 1;
+	}
+
+	if(dh_wire2val(dh_sk, dh_sk_size, &dh_server_key) != 0) {
 		return -1;
 	}
 
-	expand_keyset(keybuf, 0, keys);
-	keys->nonce = 1;
-
-	/* encrypt this and send it over */
-	/* we trust this public key, but check the size anyways */
-	if(server_key->bits >= 1000000) return -1; /* this is unreasonable */
-	keyset_m = alloc_message((server_key->bits + 7) / 8);
-	if(rsa_oaep_encrypt(server_key, keybuf, key_size, keyset_m->message, keyset_m->length) != 0) {
-		return -1;
-	}
-	add_message(con, keyset_m);
-	keyset_m = NULL; /* don't hang on to it */
-
-	/* hash the keybuf while we wait */
-	sha256(keybuf, 128, hash);
-
-	/* get the time again */
-	gettimeofday(&tv, NULL);
-
-	/* now wait for the response */
-	challenge_m = get_message(con, total_time - (utime(tv) - start));
-	if(challenge_m == NULL) {
-		return -1;
-	}
-
-	/* the actual message is 32 bytes */
-	ret = decrypt_message(keys, challenge_m, challenge_response, hlen);
+	/* range check the value */
+	ret = dh_range_check(&dh_ctx, &dh_server_key);
 	if(ret == -1) {
 		return -1;
 	}
-	free_message(challenge_m);
-	challenge_m = NULL;
-
-	/* don't bother failing early if the MAC failed */
-	ret |= memcmp_ct(hash, challenge_response, hlen);
-	if(ret) {
-		*res = BAD_CHALLENGE_RESP;	
+	if(ret == 1) {
+		*res = INVALID_DH_KEY;
+		return 1;
 	}
 
-	return 0;
+	/* we're good.  calculate the secret */
+	if(dh_compute_secret(&dh_ctx, &dh_priv_exp, &dh_server_key, &dh_secret) != 0) {
+		return -1;
+	}
+
+	/* convert to octal string */
+	dh_secret_size = dh_valwire_bufsize(&dh_secret);
+	if((dh_secret_buf = malloc(dh_secret_size)) == NULL) {
+		return -1;
+	}
+
+	if(dh_val2wire(&dh_secret, dh_secret_buf, dh_secret_size) != 0) {
+		return -1;
+	}
+
+	/* create the keybuf */
+	pbkdf2_hmac_sha256(dh_secret_buf, dh_secret_size, NULL, 0, 1, key_size, key_buf);
+
+	/* free the buffer */
+	zfree(dh_secret_buf, dh_secret_size);
+
+	expand_keyset(key_buf, 0, keys);
+	keys->nonce = 1;
+
+	/* hash the keybuf */
+	sha256(keybuf, 128, hash);
+
+	ret = memcmp_ct(hash, &server_m->message[8 + rsa_sk_size + 8 + dh_sk_size],
+		hlen);
+	if(ret) {
+		*res = INVALID_KEY_HASH;
+		return 1;
+	}
+
+	/* now check if this server is who they say they are */
+	/* check the size */
+	if(rsa_sk_size > (16384 / 8)) return -1; /* this is unreasonable */
+
+	/* expand the public key into the struct */
+	if(rsa_wire2pubkey(rsa_sk, rsa_sk_size, server_rsa_key) != 0) {
+		return -1;
+	}
+
+	sig_offset = 8 + rsa_sk_size + 8 + dh_sk_size + hlen;
+
+	ret = 0;
+	if(rsa_pss_verify(server_rsa_key,
+		&server_m->message[sig_offset], server_m->length - sig_offset,
+		&server_m->message[0], sig_offset, &ret) != 0) {
+		return -1;
+	}
+
+	if(ret) {
+		*res = INVALID_SIG;
+	}
+
+	ret = 0;
+	/* cleanup */
+	free_message(server_m); server_m = NULL;
+	memsets(key_buf, 0, key_size);
+	ret |= dh_free_ctx(&dh_ctx);
+	ret |= dh_val_free(&dh_server_key);
+	ret |= dh_val_free(&dh_public_key);
+	ret |= dh_val_free(&dh_priv_exp);
+	ret |= dh_val_free(&dh_secret);
+
+	return *res ? 1 : 0;
 }
 

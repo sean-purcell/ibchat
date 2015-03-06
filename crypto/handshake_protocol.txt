@@ -1,25 +1,37 @@
 first message
 =============
-server->client
-
-this protocol assumes 2048-bit rsa keys are used
-all hashes are sha256
-
-0x000-0x210 rsa public key, in form specified by ibcrypt
-0x210-0x420 rsa public key of trust anchor for the key
-0x420-0x520 signature of public key by one of the trust anchors
+this protocol assumes 2048-bit rsa and diffie-hellman keys are used
+group 14 as identified in rfc3526 is used for key exchange
+the keyset is obtained using pbkdf2_hmac_sha256
+the number agreed upon via diffie-hellman is converted to an octal string
+using i2osp, prefixed by the length as 8 big-endian bytes,
+and then used as the password for pbkdf2
+the salt is the empty string, and 1 iteration is used
 
 client->server
-0x000-0x100 key set, encrypted with the received public key
+	0x000-0x008 length of public key
+	0x008-0x108 g^b mod p
 
-key set:
+server->client
+0x000-0x008 length of rsa-public key
+	rsa public key:
+	0x000-0x110 rsa public key, in form specified by ibcrypt
+
+X-X+0x8     length of diffie-hellman public key
+	diffie-hellman key:
+	0x000-0x008 length of public key
+	0x008-0x108 g^a mod p
+Y-Y+0x020    hash of keybuf
+Z-Z+0x100    signature of entire above message using private key
+
+0x80 bytes are extracted from pbkdf2 using the empty string as the salt,
+and the length-prefixed octal string representation of g^(ab) mod p
+
+key buf:
 0x000-0x020 client->server symmetric key
 0x020-0x040 server->client symmetric key
 0x040-0x060 client hmac key
 0x060-0x080 server hmac key
-
-server->client
-encrypted hash of the keybuf, according to the crypto layer protocol
 
 once this is complete, they are connected, and may communicate according to the
 ibchat application layer protocol
