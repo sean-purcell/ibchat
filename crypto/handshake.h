@@ -11,10 +11,5 @@
 #define INVALID_DH_KEY     2
 #define INVALID_KEY_HASH   3
 
-struct cert {
-	uint64_t size;
-	uint8_t *cert;
-};
-
 #endif
 
