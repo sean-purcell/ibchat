@@ -84,8 +84,8 @@ int gen_key(int argc, char **argv) {
 
 	free(filename);
 
-	memset(&key, 0, sizeof(RSA_KEY));
-	memset(&pkey, 0, sizeof(RSA_PUBLIC_KEY));
+	rsa_free_pubkey(&pkey);
+	rsa_free_prikey(&key);
 
 	return 0;
 
@@ -104,8 +104,8 @@ err:;
 	}
 	fprintf(stderr, "%s", estr);
 
-	memset(&key, 0, sizeof(RSA_KEY));
-	memset(&pkey, 0, sizeof(RSA_PUBLIC_KEY));
+	rsa_free_pubkey(&pkey);
+	rsa_free_prikey(&key);
 
 	return 1;
 }
