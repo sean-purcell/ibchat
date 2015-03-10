@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include <ibcrypt/rsa.h>
 #include <ibcrypt/rsa_util.h>
@@ -70,15 +71,15 @@ int main(int argc, char **argv) {
 
 	pthread_t handler_thread;
 
-	init_handler(&handler, server.fd);
+	init_handler(&handler, client.fd);
 	pthread_create(&handler_thread, NULL, handle_connection, &handler);
 
 	ret = server_handshake(&handler, &private_key, &keys);
 	if(ret == -1) {
 		fprintf(stderr, "handshake programmatic error\n");
 		goto ehandshake;
-	} else if(ret == 1) {
-		switch(res) {
+	} else if(ret > 0) {
+		switch(ret) {
 		case INVALID_DH_KEY:
 			fprintf(stderr,
 				"client provided invalid DH key\n");
@@ -108,6 +109,9 @@ int main(int argc, char **argv) {
 	printbuf(keys.send_symm_key, 32);
 	printbuf(keys.recv_hmac_key, 32);
 	printbuf(keys.send_hmac_key, 32);
+
+	sleep(1);
+
 	/* done */
 	if(rsa_free_pubkey(&server_key) != 0) {
 		fprintf(stderr,

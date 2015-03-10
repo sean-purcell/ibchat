@@ -21,7 +21,7 @@
 /* don't import the whole file just for this */
 extern uint64_t utime(struct timeval tv);
 
-#define HANDSHAKE_DEBUG
+//#define HANDSHAKE_DEBUG
 
 #ifdef HANDSHAKE_DEBUG
 # define HS_TRACE() do { fprintf(stderr, "ERROR: %d\n", __LINE__); } while(0);
@@ -46,9 +46,6 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 	uint8_t hash[hlen];
 
 	RSA_PUBLIC_KEY rsa_pkey;
-
-	uint8_t *dh_ck;
-	uint64_t dh_ck_size;
 
 	DH_CTX dh_ctx;
 	DH_PUB dh_client_key = DH_VAL_INIT;
@@ -101,17 +98,8 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 		return -1;
 	}
 
-	dh_ck = &client_m->message[8];
-	dh_ck_size = decbe64(client_m->message);
-
-	/* check that the message size makes sense */
-	if(dh_ck_size + 8 != client_m->length) {
-		HS_TRACE();
-		return -1;
-	}
-
 	/* expand the response */
-	if(dh_wire2val(dh_ck, dh_ck_size, &dh_client_key) != 0) {
+	if(dh_wire2val(client_m->message, client_m->length, &dh_client_key) != 0) {
 		HS_TRACE();
 		return -1;
 	}
@@ -122,7 +110,7 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 		HS_TRACE();
 		return -1;
 	}
-	if(ret == 1) {
+	if(ret == 0) {
 		HS_TRACE();
 		return INVALID_DH_KEY;
 	}
@@ -202,8 +190,8 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 
 	/* cleanup */
 	ret = 0;
-	/* cleanup */
-	free_message(server_m); server_m = NULL;
+
+	free_message(client_m); client_m = NULL;
 	memsets(key_buf, 0, key_size);
 	ret |= dh_free_ctx(&dh_ctx);
 	ret |= dh_val_free(&dh_client_key);
@@ -302,7 +290,7 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 	}
 
 	rsa_sk = &server_m->message[8];
-	rsa_sk_size = decbe64(&server_m[0]);
+	rsa_sk_size = decbe64(&server_m->message[0]);
 
 	/* message size sanity checks */
 	if(8 + rsa_sk_size + 8 > server_m->length) {
@@ -318,7 +306,7 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 		return -1;
 	}
 
-	if(dh_sk_size > (dh_ctx.bits + 7) / 8) {
+	if(dh_sk_size > (dh_ctx.bits + 7) / 8 + 8) {
 		*res = INVALID_DH_KEY;
 		HS_TRACE();
 		return 1;
@@ -335,7 +323,7 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 		HS_TRACE();
 		return -1;
 	}
-	if(ret == 1) {
+	if(ret == 0) {
 		*res = INVALID_DH_KEY;
 		HS_TRACE();
 		return 1;
@@ -407,7 +395,7 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 		return -1;
 	}
 
-	if(ret) {
+	if(ret == 0) {
 		*res = INVALID_SIG;
 	}
 

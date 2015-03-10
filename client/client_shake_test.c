@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include <ibcrypt/rsa.h>
 #include <ibcrypt/rsa_util.h>
@@ -93,6 +94,9 @@ int main(int argc, char **argv) {
 	printbuf(keys.recv_symm_key, 32);
 	printbuf(keys.send_hmac_key, 32);
 	printbuf(keys.recv_hmac_key, 32);
+
+	sleep(1);
+
 	/* done */
 	if(rsa_free_pubkey(&server_key) != 0) {
 		fprintf(stderr,

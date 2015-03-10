@@ -18,7 +18,7 @@
 #include "message.h"
 #include "protocol.h"
 
-#define PROTO_DEBUG
+//#define PROTO_DEBUG
 
 #define WAIT_TIMEOUT (50000)
 #define ACK_WAITTIME (5000000ULL)
