@@ -10,6 +10,7 @@
 
 #include "../crypto/handshake.h"
 #include "../crypto/crypto_layer.h"
+#include "../crypto/keyfile.h"
 #include "../inet/connect.h"
 
 #define PORT "35931"
@@ -17,56 +18,70 @@
 int main(int argc, char **argv) {
 	signal(SIGPIPE, SIG_IGN);
 	if(argc != 2) {
-		fprintf(stderr, "usage: %s <address>\n", argv[0]);
+		fprintf(stderr, "usage: %s <private key file>\n", argv[0]);
 		return 1;
 	}
 
 	struct sock server;
+	struct sock client;
 
-	server = client_connect(argv[1], PORT);
+	server = server_bind(PORT);
 	if(server.fd == -1) {
 		if(errno == 0) {
 			fprintf(stderr, "getaddrinfo failed\n");
 		} else {
-			perror("connect error");
+			perror("bind error");
 		}
 
 		return 1;
 	}
 
-	printf("connected to %s\n", server.address);
+	printf("server opened on local ip %s\n", server.address);
 
-	/* initiate handshake */
+	client = server_accept(server.fd);
+	if(client.fd == -1) {
+		perror("accept error");
+
+		return 1;
+	}
+
+	printf("client connected from %s\n", client.address);
+
+	RSA_KEY private_key;
+	RSA_PUBLIC_KEY server_key;
 	struct con_handle handler;
 	struct keyset keys;
-	RSA_PUBLIC_KEY server_key;
 	uint8_t *server_key_buf;
 	uint64_t server_key_bufsize;
 	int res;
 	int ret;
+
+	/* load private key */
+	ret = read_pri_key(argv[1], &private_key);
+	if(ret != 0) {
+		goto ekey;
+	}
+
+	if(rsa_pub_key(&private_key, &server_key) != 0) {
+		goto epub;
+	}
+
+	/* initiate handshake */
 
 	pthread_t handler_thread;
 
 	init_handler(&handler, server.fd);
 	pthread_create(&handler_thread, NULL, handle_connection, &handler);
 
-	ret = client_handshake(&handler, &server_key, &keys, &res);
+	ret = server_handshake(&handler, &private_key, &keys);
 	if(ret == -1) {
 		fprintf(stderr, "handshake programmatic error\n");
 		goto ehandshake;
 	} else if(ret == 1) {
 		switch(res) {
-		case INVALID_SIG:
-			fprintf(stderr,
-				"server provided invalid signature\n");
-			break;
 		case INVALID_DH_KEY:
 			fprintf(stderr,
-				"server provided invalid DH key\n");
-			break;
-		case INVALID_KEY_HASH:
-			fprintf(stderr,
-				"server provided invalid key hash\n");
+				"client provided invalid DH key\n");
 			break;
 		}
 
@@ -86,17 +101,22 @@ int main(int argc, char **argv) {
 			"failed to convert to wire format\n");
 		goto eprint;
 	}
-	printf("public key:\n");
+	printf("server public key:\n");
 	printbuf(server_key_buf, server_key_bufsize);
 	printf("symmetric keys:\n");
-	printbuf(keys.send_symm_key, 32);
 	printbuf(keys.recv_symm_key, 32);
-	printbuf(keys.send_hmac_key, 32);
+	printbuf(keys.send_symm_key, 32);
 	printbuf(keys.recv_hmac_key, 32);
+	printbuf(keys.send_hmac_key, 32);
 	/* done */
 	if(rsa_free_pubkey(&server_key) != 0) {
 		fprintf(stderr,
 			"failed to free public key\n");
+		goto efree;
+	}
+	if(rsa_free_prikey(&private_key) != 0) {
+		fprintf(stderr,
+			"failed to free private key\n");
 		goto efree;
 	}
 	memset(&keys, 0, sizeof(struct keyset));
@@ -112,9 +132,11 @@ eprint:
 efree:
 	free(server_key_buf);
 ehandshake:
+	rsa_free_prikey(&private_key);
+ekey:
+epub:
 	end_handler(&handler);
 	destroy_handler(&handler);
 
 	return 1;
 }
-
