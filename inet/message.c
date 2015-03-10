@@ -69,6 +69,8 @@ struct message *alloc_message(uint64_t size) {
 		return NULL;
 	}
 
+	m->length = size;
+
 	errno = 0;
 	return m;
 }

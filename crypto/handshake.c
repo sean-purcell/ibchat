@@ -21,6 +21,14 @@
 /* don't import the whole file just for this */
 extern uint64_t utime(struct timeval tv);
 
+#define HANDSHAKE_DEBUG
+
+#ifdef HANDSHAKE_DEBUG
+# define HS_TRACE() do { fprintf(stderr, "ERROR: %d\n", __LINE__); } while(0);
+#else
+# define HS_TRACE() do { } while(0);
+#endif
+
 int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *keys) {
 	/* measure our starting time, we allow maximum 5 seconds for this */
 	struct timeval tv;
@@ -68,16 +76,20 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 
 	/* create a public key from our private key */
 	if(rsa_pub_key(rsa_key, &rsa_pkey) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
 	if(dh_init_ctx(&dh_ctx, 14) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 	if(dh_gen_exp(&dh_ctx, &dh_priv_exp) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 	if(dh_gen_pub(&dh_ctx, &dh_priv_exp, &dh_public_key) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
@@ -85,6 +97,7 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 	gettimeofday(&tv, NULL);
 	client_m = get_message(con, total_time - (utime(tv) - start));
 	if(client_m == NULL) {
+		HS_TRACE();
 		return -1;
 	}
 
@@ -93,35 +106,42 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 
 	/* check that the message size makes sense */
 	if(dh_ck_size + 8 != client_m->length) {
+		HS_TRACE();
 		return -1;
 	}
 
 	/* expand the response */
 	if(dh_wire2val(dh_ck, dh_ck_size, &dh_client_key) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
 	/* range check the value */
 	ret = dh_range_check(&dh_ctx, &dh_client_key);
 	if(ret == -1) {
+		HS_TRACE();
 		return -1;
 	}
 	if(ret == 1) {
+		HS_TRACE();
 		return INVALID_DH_KEY;
 	}
 
 	/* calculate the secret */
 	if(dh_compute_secret(&dh_ctx, &dh_priv_exp, &dh_client_key, &dh_secret) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
 	/* convert to octal string */
 	dh_secret_size = dh_valwire_bufsize(&dh_secret);
 	if((dh_secret_buf = malloc(dh_secret_size)) == NULL) {
+		HS_TRACE();
 		return -1;
 	}
 
 	if(dh_val2wire(&dh_secret, dh_secret_buf, dh_secret_size) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
@@ -145,6 +165,7 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 
 	server_m = alloc_message(response_size);
 	if(server_m == NULL) {
+		HS_TRACE();
 		return -1;
 	}
 
@@ -157,20 +178,24 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 
 	encbe64(rsa_key_size - 8, &response[rsa_key_off]);
 	if(rsa_pubkey2wire(&rsa_pkey, &response[rsa_key_off + 8], rsa_key_size - 8) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
 	encbe64(dh_key_size - 8, &response[dh_key_off]);
 	if(dh_val2wire(&dh_public_key, &response[dh_key_off + 8], dh_key_size - 8) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
 	memcpy(&response[hash_off], hash, hlen);
 
 	if(rsa_pss_sign(rsa_key, response, sig_off, &response[sig_off], sig_size) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
+	server_m->seq_num = 0;
 	/* message constructed, fire away */
 	add_message(con, server_m);
 	server_m = NULL;
@@ -187,6 +212,7 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 	ret |= dh_val_free(&dh_secret);
 
 	if(ret) {
+		HS_TRACE();
 		return -1;
 	}
 
@@ -238,24 +264,31 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 
 	/* initialize our DH context */
 	if(dh_init_ctx(&dh_ctx, 14) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 	if(dh_gen_exp(&dh_ctx, &dh_priv_exp) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 	if(dh_gen_pub(&dh_ctx, &dh_priv_exp, &dh_public_key) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
 	/* send the public key message */
 	client_m = alloc_message(dh_valwire_bufsize(&dh_public_key));
 	if(client_m == NULL) {
+		HS_TRACE();
 		return -1;
 	}
 
 	if(dh_val2wire(&dh_public_key, client_m->message, client_m->length) != 0) {
+		HS_TRACE();
 		return -1;
 	}
+
+	client_m->seq_num = 0;
 
 	add_message(con, client_m);
 	client_m = NULL;
@@ -264,6 +297,7 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 	gettimeofday(&tv, NULL);
 	server_m = get_message(con, total_time - (utime(tv) - start));
 	if(server_m == NULL) {
+		HS_TRACE();
 		return -1;
 	}
 
@@ -272,6 +306,7 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 
 	/* message size sanity checks */
 	if(8 + rsa_sk_size + 8 > server_m->length) {
+		HS_TRACE();
 		return -1;
 	}
 
@@ -279,40 +314,48 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 	dh_sk_size = decbe64(&server_m->message[8 + rsa_sk_size]);
 
 	if(8 + rsa_sk_size + 8 + dh_sk_size > server_m->length) {
+		HS_TRACE();
 		return -1;
 	}
 
 	if(dh_sk_size > (dh_ctx.bits + 7) / 8) {
 		*res = INVALID_DH_KEY;
+		HS_TRACE();
 		return 1;
 	}
 
 	if(dh_wire2val(dh_sk, dh_sk_size, &dh_server_key) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
 	/* range check the value */
 	ret = dh_range_check(&dh_ctx, &dh_server_key);
 	if(ret == -1) {
+		HS_TRACE();
 		return -1;
 	}
 	if(ret == 1) {
 		*res = INVALID_DH_KEY;
+		HS_TRACE();
 		return 1;
 	}
 
 	/* we're good.  calculate the secret */
 	if(dh_compute_secret(&dh_ctx, &dh_priv_exp, &dh_server_key, &dh_secret) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
 	/* convert to octal string */
 	dh_secret_size = dh_valwire_bufsize(&dh_secret);
 	if((dh_secret_buf = malloc(dh_secret_size)) == NULL) {
+		HS_TRACE();
 		return -1;
 	}
 
 	if(dh_val2wire(&dh_secret, dh_secret_buf, dh_secret_size) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
@@ -330,21 +373,27 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 
 	/* compare to the included hash, with a sanity check first */
 	if(8 + rsa_sk_size + 8 + dh_sk_size + hlen > server_m->length) {
+		HS_TRACE();
 		return -1;
 	}
 	ret = memcmp_ct(hash, &server_m->message[8 + rsa_sk_size + 8 + dh_sk_size],
 		hlen);
 	if(ret) {
 		*res = INVALID_KEY_HASH;
+		HS_TRACE();
 		return 1;
 	}
 
 	/* now check if this server is who they say they are */
 	/* check the size */
-	if(rsa_sk_size > (16384 / 8)) return -1; /* this is unreasonable */
+	if(rsa_sk_size > (16384 / 8)) {
+		HS_TRACE();
+		return -1; /* this is unreasonable */
+	}
 
 	/* expand the public key into the struct */
 	if(rsa_wire2pubkey(rsa_sk, rsa_sk_size, server_rsa_key) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
@@ -354,6 +403,7 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 	if(rsa_pss_verify(server_rsa_key,
 		&server_m->message[sig_offset], server_m->length - sig_offset,
 		&server_m->message[0], sig_offset, &ret) != 0) {
+		HS_TRACE();
 		return -1;
 	}
 
@@ -372,6 +422,7 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 	ret |= dh_val_free(&dh_secret);
 
 	if(ret) {
+		HS_TRACE();
 		return -1;
 	}
 
