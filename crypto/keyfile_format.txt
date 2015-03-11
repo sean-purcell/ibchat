@@ -1,0 +1,39 @@
+public key files:
+	file extension: .pub (optional)
+
+	format:
+
+	0x0000-0x0008       "ibrsakey" magic string, must match to be valid
+	0x0008-0x0010 (u64) 1 big-endian, indicates it is a public key
+	0x0010-0x0018 (u64) N, size of the public modulus, in bits
+	0x0018-     X       modulus, in i2osp form
+	     X-X+0x08 (u64) public exponent, big-endian
+
+private key files:
+	file extension: .pri (optional)
+
+	format:
+
+	0x0000-0x0008       "ibrsakey" magic string, must match to be valid
+	0x0008-0x0010 (u64) 2 big-endian, indicates it is a private key
+	0x0010-0x0018 (u64) 1 or 2 big-endian
+
+	if 1, it is not password protected:
+	0x0018-0x0020 (u64) N, size of the public modulus, in bits
+	0x0020-     X       p, first prime, i2osp form
+	     X-     Y       q, second prime, i2osp form
+	     Y-     Z       d, private exponent, i2osp form
+	     Z-Z+0x08 (u64) e, public exponent, big-endian
+
+	if 2, it is password protected
+	encryption is done using chacha, the mac is hmac_sha256
+	key is derived from the password using scrypt, with parameters of N=2^16, r=8, p=1
+	a random 32-byte salt is used
+	64 bytes are extracted, first 32 are chacha key, second 32 are mac key
+	a nonce of 0 is used for encryption
+
+	0x0018-0x0020 (u64) length of encrypted key, in bytes, big-endian
+	0x0020-0x0040       random bytes, salt
+	0x0040-     X       private key, in the same format as above, encrypted with chacha
+	     X-X+0x20       mac of the above message using the mac key
+

@@ -3,7 +3,6 @@
 #include <string.h>
 
 int gen_key(int, char**);
-int sign_key(int, char**);
 int help(int, char**);
 
 struct program {
@@ -13,7 +12,6 @@ struct program {
 
 struct program programs[] = {
 	{ &gen_key, "keygen" },
-	{ &sign_key, "keysign" },
 	{ &help, "help" },
 };
 
