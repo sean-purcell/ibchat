@@ -263,7 +263,7 @@ static int read_pri_key_password(RSA_KEY *key, uint8_t **buf, uint64_t *bufsize,
 	int pass_prompted = 0;
 	if(!password) {
 		/* prompt for the password */
-		password = ibchat_getpass("Key encryption password:", NULL, 1);
+		password = ibchat_getpass("Private key encryption password", NULL, 1);
 		pass_prompted = 1;
 	}
 

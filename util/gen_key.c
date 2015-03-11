@@ -5,10 +5,12 @@
 #include <limits.h>
 #include <errno.h>
 
+#include <ibcrypt/bignum.h>
 #include <ibcrypt/rsa.h>
 #include <ibcrypt/rsa_util.h>
-#include <ibcrypt/bignum.h>
+#include <ibcrypt/zfree.h>
 
+#include "getpass.h"
 #include "../crypto/keyfile.h"
 
 int gen_key(int argc, char **argv) {
@@ -43,9 +45,23 @@ int gen_key(int argc, char **argv) {
 	RSA_KEY key;
 	RSA_PUBLIC_KEY pkey;
 	char *filename = NULL;
+	char *password = NULL;
 	size_t fname_size;
 
 	int ret;
+
+	password = ibchat_getpass(
+		"Private key password (empty string for no pass)",
+		"Confirm password",
+		1);
+
+	if(password == NULL) {
+		goto err;
+	}
+	if(strcmp(password, "") == 0) {
+		free(password);
+		password = NULL;
+	}
 
 	if((ret = rsa_gen_key(&key, bits, exp)) != 0) {
 		goto err;
@@ -68,7 +84,7 @@ int gen_key(int argc, char **argv) {
 	memcpy(filename, argv[1], fname_size);
 
 	memcpy(&filename[fname_size], ".pri", 5);
-	ret = write_pri_key(&key, filename);
+	ret = write_pri_key(&key, filename, password);
 	if(ret != 0) {
 		goto err;
 	}
@@ -87,9 +103,10 @@ int gen_key(int argc, char **argv) {
 	rsa_free_pubkey(&pkey);
 	rsa_free_prikey(&key);
 
+	if(password) zfree(password, strlen(password));
+
 	return 0;
 
-	int e = 0;
 err:;
 	char *estr = NULL;
 	switch(ret) {
@@ -106,6 +123,8 @@ err:;
 
 	rsa_free_pubkey(&pkey);
 	rsa_free_prikey(&key);
+
+	if(password) zfree(password, strlen(password));
 
 	return 1;
 }
