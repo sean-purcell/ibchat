@@ -5,4 +5,5 @@ a.out
 *.pri
 *.pub
 ibchat*
+*_test
 

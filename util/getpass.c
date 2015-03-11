@@ -4,6 +4,8 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include <ibcrypt/zfree.h>
+
 #include "getpass.h"
 
 char* ibchat_getpass(const char* prompt, const char* confprompt, int usetty) {

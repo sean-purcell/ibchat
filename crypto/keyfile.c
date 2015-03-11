@@ -34,6 +34,7 @@ static int write_pri_key_password(uint8_t *key, uint64_t key_size, FILE *out, ch
 int write_pri_key(RSA_KEY *key, const char *filename, char *password) {
 	uint64_t size = rsa_prikey_bufsize(key->bits);
 	uint8_t numbuf[8];
+	uint8_t typebuf[8];
 	uint8_t *buf;
 	FILE *out;
 
@@ -59,6 +60,9 @@ int write_pri_key(RSA_KEY *key, const char *filename, char *password) {
 
 	encbe64(2, numbuf);
 	WRITE(numbuf, 8, out);
+
+	encbe64(password ? 2 : 1, typebuf);
+	WRITE(typebuf, 8, out);
 
 	if(password) {
 		ret = write_pri_key_password(buf, size, out, password);
@@ -247,7 +251,7 @@ static int read_pri_key_nopassword(RSA_KEY *key, uint8_t **buf, uint64_t *bufsiz
 
 	memcpy(*buf, size_buf, 8);
 
-	READ(&(*buf[8]), size - 8, in);
+	READ(&(*buf)[8], size - 8, in);
 
 	ret = 0;
 
