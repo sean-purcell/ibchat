@@ -56,6 +56,7 @@ int gen_key(int argc, char **argv) {
 		1);
 
 	if(password == NULL) {
+		ret = 10;
 		goto err;
 	}
 	if(strcmp(password, "") == 0) {
@@ -118,6 +119,8 @@ err:;
 		estr = "failed to open file\n"; break;
 	case WRITE_FAIL:
 		estr = "failed to write to file\n"; break;
+	case 10:
+		estr = "failed to read password\n"; break;
 	}
 	fprintf(stderr, "%s", estr);
 

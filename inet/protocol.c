@@ -55,7 +55,6 @@ struct ack_map_el {
 
 static int ack_map_add(struct ack_map *map, uint64_t seq_num, uint64_t time);
 static int ack_map_rm(struct ack_map *map, uint64_t seq_num);
-static uint64_t ack_map_get(struct ack_map *map, uint64_t seq_num);
 
 static int write_messages(struct con_handle *con, struct ack_map *map);
 static int read_message(struct con_handle *con, struct ack_map *map);
@@ -145,8 +144,6 @@ void *handle_connection(void *_con) {
 	pthread_cleanup_push(handler_cleanup, _con);
 	struct con_handle *con = ((struct con_handle *) _con);
 	struct ack_map map;
-
-	uint8_t inbuf[INBUF_SIZE + 1];
 
 	fd_set rset;
 	fd_set wset;
@@ -293,7 +290,6 @@ static int write_messages(struct con_handle *con, struct ack_map *map) {
 	uint8_t buf[8];
 	uint8_t hash[32];
 	ssize_t written;
-	ssize_t total;
 
 	struct timeval tv;
 	uint64_t start;
@@ -347,7 +343,6 @@ static int write_messages(struct con_handle *con, struct ack_map *map) {
 		gettimeofday(&tv, NULL);
 	}
 
-exit:
 	return 0;
 error:
 	return -1;
@@ -440,7 +435,6 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 		goto error;
 	}
 
-exit:
 	return 0;
 error:
 	return -1;
@@ -554,7 +548,6 @@ static int write_keepalive(struct con_handle *con) {
 	written = send_bytes(con->sockfd, buf, 4, 0, 5000ULL);
 	IO_CHECK(written, 4);
 
-exit:
 	return 0;
 error:
 	return -1;
@@ -572,7 +565,6 @@ static int write_acknowledge(struct con_handle *con, uint64_t seq_num) {
 	written = send_bytes(con->sockfd, buf, 8, 0, 5000ULL);
 	IO_CHECK(written, 8);
 
-exit:
 	return 0;
 error:
 	return -1;
@@ -626,19 +618,5 @@ static int ack_map_rm(struct ack_map *map, uint64_t seq_num) {
 	}
 
 	return -1;
-}
-
-static uint64_t ack_map_get(struct ack_map *map, uint64_t seq_num) {
-	struct ack_map_el *el;
-
-	el = map->lists[seq_num & ACK_MAP_MASK];
-
-	while(el != NULL) {
-		if(el->seq_num == seq_num) {
-			return el->time;
-		}
-	}
-
-	return ACK_MAP_FAIL;
 }
 

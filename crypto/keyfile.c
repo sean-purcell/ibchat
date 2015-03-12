@@ -35,8 +35,8 @@ int write_pri_key(RSA_KEY *key, const char *filename, char *password) {
 	uint64_t size = rsa_prikey_bufsize(key->bits);
 	uint8_t numbuf[8];
 	uint8_t typebuf[8];
-	uint8_t *buf;
-	FILE *out;
+	uint8_t *buf = NULL;
+	FILE *out = NULL;
 
 	int ret = 0;
 
@@ -129,8 +129,8 @@ err:
 int write_pub_key(RSA_PUBLIC_KEY *key, const char *filename) {
 	size_t size = rsa_pubkey_bufsize(key->bits);
 	uint8_t numbuf[8];
-	uint8_t *buf;
-	FILE *out;
+	uint8_t *buf = NULL;
+	FILE *out = NULL;
 
 	int ret = 0;
 
@@ -170,7 +170,6 @@ static int read_pri_key_password(RSA_KEY *key, uint8_t **buf, uint64_t *bufsize,
 int read_pri_key(const char *filename, RSA_KEY *key, char *password) {
 	uint8_t magic_buf[magic_len];
 	uint8_t num_buf[8];
-	uint8_t size_buf[8];
 	uint8_t *buf = NULL;
 	uint64_t bufsize;
 	FILE *in = NULL;

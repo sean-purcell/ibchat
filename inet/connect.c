@@ -29,8 +29,6 @@ struct sock client_connect(char *address, char *port) {
 	struct addrinfo *servinfo;
 	struct addrinfo *server;
 
-	socklen_t size;
-
 	struct sock con;
 
 	memset(&hints, 0x00, sizeof(hints));
