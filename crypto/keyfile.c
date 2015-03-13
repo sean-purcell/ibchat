@@ -259,11 +259,8 @@ err:
 }
 
 static int read_pri_key_password(RSA_KEY *key, uint8_t **buf, uint64_t *bufsize, FILE *in, char *password) {
-	int pass_prompted = 0;
-	if(!password) {
-		/* prompt for the password */
-		password = ibchat_getpass("Private key encryption password", NULL, 1);
-		pass_prompted = 1;
+	if(password == NULL) {
+		return NO_PASSWORD;
 	}
 
 	uint8_t salt[32];
@@ -323,10 +320,6 @@ err:
 	memsets(keybuf, 0, 64);
 	memsets(macbuf1, 0, 32);
 	memsets(macbuf2, 0, 32);
-
-	if(pass_prompted) {
-		zfree(password, strlen(password));
-	}
 
 	return ret;
 }

@@ -27,8 +27,8 @@ int main(int argc, char **argv) {
 	struct sock client;
 
 	server = server_bind(PORT);
-	if(server.fd == -1) {
-		if(errno == 0) {
+	if(server.fd < 0) {
+		if(server.fd == -2) {
 			fprintf(stderr, "getaddrinfo failed\n");
 		} else {
 			perror("bind error");

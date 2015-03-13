@@ -10,12 +10,13 @@
 #define READ_FAIL 4
 #define INVALID_FILE 5
 #define INVALID_MAC 6
+#define NO_PASSWORD 7
 
 /* if password is NULL it will be encrypted without a key */
 int write_pri_key(RSA_KEY *key, const char *filename, char *password);
 int write_pub_key(RSA_PUBLIC_KEY *pkey, const char *filename);
 
-/* if password is NULL and needed, it will be prompted for */
+/* if password is NULL and needed, it will cause an error */
 int read_pri_key(const char *filename, RSA_KEY *key, char *password);
 int read_pub_key(const char *filename, RSA_PUBLIC_KEY *pkey);
 

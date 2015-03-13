@@ -90,8 +90,8 @@ struct sock server_bind(char *port) {
 	hints.ai_flags = AI_PASSIVE;
 
 	if((ret = getaddrinfo(NULL, port, &hints, &servinfo)) != 0) {
-		errno = 0;
-		con.fd = -1;
+		errno = ret;
+		con.fd = -2;
 		return con;
 	}
 
