@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <errno.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
@@ -68,6 +69,22 @@ uint64_t utime(struct timeval tv) {
 	return (uint64_t)tv.tv_sec * 1000000ULL + (uint64_t)tv.tv_usec;
 }
 
+int launch_handler(pthread_t *thread, struct con_handle *con) {
+	pthread_attr_t attr;
+	if(pthread_attr_init(&attr) != 0) {
+		return -1;
+	}
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	if(pthread_create(thread, &attr, handle_connection, con) != 0) {
+		return -1;
+	}
+
+	pthread_attr_destroy(&attr);
+
+	return 0;
+}
+
 /* you may NOT own the kill_mutex mutex when you call this function */
 void end_handler(struct con_handle *con) {
 	pthread_mutex_lock(&con->kill_mutex);
@@ -83,7 +100,6 @@ int handler_status(struct con_handle *con) {
 	pthread_mutex_unlock(&con->kill_mutex);
 	return s;
 }
-
 
 void init_handler(struct con_handle *con, int sockfd) {
 	con->sockfd = sockfd;

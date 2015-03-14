@@ -18,6 +18,8 @@ struct con_handle {
 
 void *handle_connection(void *_con);
 
+int launch_handler(pthread_t *thread, struct con_handle *con);
+
 int handler_status(struct con_handle *con);
 void end_handler(struct con_handle *con);
 void init_handler(struct con_handle *con, int sockfd);

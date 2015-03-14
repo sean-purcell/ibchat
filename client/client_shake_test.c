@@ -13,7 +13,7 @@
 #include "../crypto/crypto_layer.h"
 #include "../inet/connect.h"
 
-#define PORT "35931"
+#define PORT "41032"
 
 int main(int argc, char **argv) {
 	signal(SIGPIPE, SIG_IGN);

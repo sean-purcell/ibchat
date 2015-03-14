@@ -7,13 +7,23 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <sys/select.h>
+#include <sys/time.h>
+#include <sys/types.h>
+
 #include <ibcrypt/rsa.h>
 #include <ibcrypt/zfree.h>
 
+#include "client_handler.h"
 #include "../crypto/keyfile.h"
 #include "../inet/connect.h"
 #include "../util/getpass.h"
 #include "../util/defaults.h"
+
+/* central operating info */
+RSA_KEY server_key;
+char *password;
+/* ---------------------- */
 
 void usage(char *argv0) {
 	fprintf(stderr, "usage: %s [-p port]"
@@ -37,7 +47,7 @@ void signal_stop(int signum);
 int load_server_key(char *keyfile, char *password, RSA_KEY *server_key);
 int server_bind_err(struct sock server_socket);
 
-int handle_connections(int server_socket, RSA_KEY *server_key, char *password) {return 0;}
+int handle_connections(int server_socket);
 
 static struct {
 	char *port;
@@ -53,11 +63,13 @@ int chat_server(int argc, char **argv) {
 	}
 	print_opts();
 
-	char *password = NULL;
-	RSA_KEY server_key;
-	struct sock server_socket;
-
+	password = NULL;
 	memset(&server_key, 0, sizeof(RSA_KEY));
+	if(init_handler_table() != 0) {
+		fprintf(stderr, "failed to initialize handler table: %s\n",
+			strerror(errno));
+		return 1;
+	}
 
 	if(opts.use_password) {
 		password = ibchat_getpass("Server password", NULL, 1);
@@ -73,7 +85,7 @@ int chat_server(int argc, char **argv) {
 	}
 
 	/* set up the server */
-	server_socket = server_bind(opts.port);
+	struct sock server_socket = server_bind(opts.port);
 	if(server_bind_err(server_socket) != 0) {
 		goto err2;
 	}
@@ -82,7 +94,9 @@ int chat_server(int argc, char **argv) {
 
 	/* program main body */
 	init_sighandlers();
-	if(handle_connections(server_socket.fd, &server_key, password) != 0) {
+	/* TODO: start the manager thread */
+	if(handle_connections(server_socket.fd) != 0) {
+		fprintf(stderr, "handle connections error: %s\n", strerror(errno));
 		goto err3;
 	}
 
@@ -101,6 +115,43 @@ err1:
 	if(password) zfree(password, strlen(password));
 	rsa_free_prikey(&server_key);
 
+	return 1;
+}
+
+int handle_connections(int server_socket) {
+	stop = 0;
+
+	fd_set rd_set;
+	struct timeval timeout;
+
+	while(stop == 0) {
+		FD_ZERO(&rd_set);
+		FD_SET(server_socket, &rd_set);
+		timeout.tv_sec = 0;
+		timeout.tv_usec = 1000;
+
+		if(select(FD_SETSIZE, &rd_set, NULL, NULL, &timeout) == -1) {
+			if(errno == EINTR) {
+				continue;
+			} else {
+				goto err;
+			}
+		}
+
+		if(FD_ISSET(server_socket, &rd_set)) {
+			/* accept a connection and set it up */
+			struct sock client = server_accept(server_socket);
+			printf("received connection from %s with fd %d\n",
+				client.address, client.fd);
+
+			if(spawn_handler(client.fd) != 0) {
+				goto err;
+			}
+		}
+	}
+
+	return 0;
+err:
 	return 1;
 }
 

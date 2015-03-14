@@ -8,7 +8,7 @@ else
 endif
 LINKFLAGS=-flto
 
-LIBINC=-I libibur/bin -I ibcrypt/bin/include
+LIBINC=-I libibur/bin -I ibcrypt/bin/include -pthread
 LIBS=-Libcrypt/bin -libcrypt
 
 DIRS=server client inet crypto util
