@@ -19,7 +19,7 @@
 #include "message.h"
 #include "protocol.h"
 
-//#define PROTO_DEBUG
+#define PROTO_DEBUG
 
 #define WAIT_TIMEOUT (50000)
 #define ACK_WAITTIME (5000000ULL)
@@ -192,7 +192,9 @@ void *handle_connection(void *_con) {
 			fprintf(stderr, "%d: select error: %s\n", __LINE__,
 				strerror(errno));
 #endif
-			continue;
+			if(errno != EINTR) {
+				goto error;
+			}
 		}
 
 		if(FD_ISSET(con->sockfd, &rset)) {
@@ -201,7 +203,7 @@ void *handle_connection(void *_con) {
 				if(ret != EBUSY) {
 #ifdef PROTO_DEBUG
 					fprintf(stderr, "%d: mutex lock error: %s\n",
-						__LINE__, strerror(errno));
+						__LINE__, strerror(ret));
 #endif
 					goto error;
 				}
@@ -225,7 +227,7 @@ void *handle_connection(void *_con) {
 				if(ret != EBUSY) {
 #ifdef PROTO_DEBUG
 					fprintf(stderr, "%d: mutex lock error: %s\n",
-						__LINE__, strerror(errno));
+						__LINE__, strerror(ret));
 #endif
 					goto error;
 				}
@@ -377,7 +379,7 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 
 	struct timeval now;
 
-	received = read_bytes(con->sockfd, buf, 4, 0, 5000ULL);
+	received = read_bytes(con->sockfd, buf, 4, 0, 10000ULL);
 	IO_CHECK(received, 4);
 
 	type = decbe32(buf);

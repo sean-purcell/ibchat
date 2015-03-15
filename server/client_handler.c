@@ -125,6 +125,9 @@ err4:
 	pthread_join(ch_thread, NULL);
 err3:
 	destroy_handler(&con_handler);
+	if(rem_handler(handler.id) != 0) {
+		fprintf(stderr, "%d: the handler table has been corrupted\n", handler.fd);
+	}
 err2:
 	destroy_client_handler(&handler);
 err1:
@@ -138,6 +141,7 @@ err1:
 #define BOT_LOAD (0.5 / 2)
 
 #define MAX_SIZE ((uint64_t)1 << 20)
+#define MIN_SIZE ((uint64_t) 16)
 
 #define MAX_READERS INT_MAX - 1
 
@@ -192,7 +196,7 @@ static void ht_release_writelock() {
 }
 
 static int resize_handler_table(uint64_t nsize) {
-	if(nsize > MAX_SIZE) {
+	if(nsize > MAX_SIZE || nsize < MIN_SIZE) {
 		return 0;
 	}
 
@@ -228,9 +232,13 @@ static int resize_handler_table(uint64_t nsize) {
 }
 
 int init_handler_table() {
-// TODO: start bigger than 0
-	ht.buckets = NULL;
-	ht.size = 0;
+	size_t size = MIN_SIZE * sizeof(struct client_handler *);
+	ht.buckets = malloc(size);
+	if(ht.buckets == NULL) {
+		return 1;
+	}
+	memset(ht.buckets, 0, size);
+	ht.size = MIN_SIZE;
 	ht.elements = 0;
 
 	ht.use_state = 0;
