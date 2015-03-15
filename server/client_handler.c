@@ -97,6 +97,8 @@ void *client_handler(void *_arg) {
 		goto err2;
 	}
 
+	int ret;
+
 	struct con_handle con_handler;
 	pthread_t ch_thread;
 	struct keyset keys;
@@ -109,8 +111,8 @@ void *client_handler(void *_arg) {
 	}
 
 	/* complete the handshake */
-	if(server_handshake(&con_handler, &server_key, &keys) != 0) {
-		printf("%d: failed to complete handshake\n", handler.fd);
+	if((ret = server_handshake(&con_handler, &server_key, &keys)) != 0) {
+		printf("%d: failed to complete handshake: %d\n", handler.fd, ret);
 		goto err4;
 	}
 
@@ -131,8 +133,6 @@ err3:
 err2:
 	destroy_client_handler(&handler);
 err1:
-	close(handler.fd);
-
 	return NULL;
 }
 

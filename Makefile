@@ -2,7 +2,9 @@ CC=gcc
 BUILDDIR=bin
 OBJECTDIR=$(BUILDDIR)/objects
 CFLAGS=-Wall -Werror -std=gnu99 -g
+IBCRYPTFLAGS=
 ifeq ($(NO-OPTIMIZE),1)
+	IBCRYPTFLAGS+=NO-OPTIMIZE=1
 else
 	CFLAGS+=-O3
 endif
@@ -38,7 +40,7 @@ client: bin libs $(CLIENTOBJECTS)
 
 libs:
 	git submodule update --init --recursive
-	$(MAKE) -C ibcrypt
+	$(MAKE) -C ibcrypt $(IBCRYPTFLAGS)
 	$(MAKE) -C libibur
 
 $(OBJECTDIR)/%.o: %.c $(OBJECTDIR)

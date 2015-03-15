@@ -21,7 +21,7 @@
 /* don't import the whole file just for this */
 extern uint64_t utime(struct timeval tv);
 
-//#define HANDSHAKE_DEBUG
+#define HANDSHAKE_DEBUG
 
 #ifdef HANDSHAKE_DEBUG
 # define HS_TRACE() do { fprintf(stderr, "ERROR: %d\n", __LINE__); } while(0);
@@ -178,8 +178,11 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 
 	memcpy(&response[hash_off], hash, hlen);
 
-	if(rsa_pss_sign(rsa_key, response, sig_off, &response[sig_off], sig_size) != 0) {
+	if((ret = rsa_pss_sign(rsa_key, response, sig_off, &response[sig_off], sig_size)) != 0) {
 		HS_TRACE();
+#ifdef HANDSHAKE_DEBUG
+		fprintf(stderr, "rsa_pss_sign ret:%d\n", ret);
+#endif
 		return -1;
 	}
 
@@ -216,7 +219,7 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 	struct timeval tv;
 	uint64_t start;
 
-	const uint64_t total_time = 5000000ULL;
+	const uint64_t total_time = 10000000ULL;
 
 	struct message *client_m;
 	struct message *server_m;

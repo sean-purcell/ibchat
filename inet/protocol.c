@@ -152,6 +152,7 @@ void add_message(struct con_handle *con, struct message *m) {
 static void handler_cleanup(void *_con) {
 	struct con_handle *con = ((struct con_handle *) _con);
 	end_handler(con);
+	close(con->sockfd);
 }
 
 /* handles a connection to the client or server, made to be run as a thread */
