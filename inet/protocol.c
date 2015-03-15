@@ -19,7 +19,7 @@
 #include "message.h"
 #include "protocol.h"
 
-#define PROTO_DEBUG
+//#define PROTO_DEBUG
 
 #define WAIT_TIMEOUT (50000)
 #define ACK_WAITTIME (5000000ULL)
@@ -138,7 +138,19 @@ struct message *get_message(struct con_handle *con, uint64_t timeout) {
 		gettimeofday(&now, NULL);
 	}
 
-	errno = ETIME;
+	if(!(timeout == 0 || utime(now) - utime(start) < timeout)) {
+#ifdef PROTO_DEBUG
+		fprintf(stderr, "time elapsed to read message: %llu\n", timeout);
+#endif
+
+		errno = ETIME;
+	} else {
+#ifdef PROTO_DEBUG
+		fprintf(stderr, "handler had non-zero kill status: %d\n", handler_status(con));
+#endif
+
+		errno = EPIPE;
+	}
 exit:
 	return m;
 }
@@ -295,7 +307,8 @@ void *handle_connection(void *_con) {
 
 error:
 #ifdef PROTO_DEBUG
-	perror("connection error");
+	fprintf(stderr, "%d: handler exiting: %s\n", con->sockfd,
+		strerror(errno));
 #endif
 	end_handler(con);
 exit:
@@ -319,33 +332,36 @@ static int write_messages(struct con_handle *con, struct ack_map *map) {
 	while(con->out_queue.size > 0 && utime(tv) - start < ACK_WAITTIME / 2) {
 		struct message *next_message = message_queue_top(&con->out_queue);
 
+		const uint64_t total_time = 1000000ULL;
+		uint64_t end = utime(tv) + total_time;
+
 		/* calculate sha256 hash */
 		sha256(next_message->message, next_message->length, hash);
 
-		/* give writing the type 5ms */
 		encbe32(2, buf);
-		written = send_bytes(con->sockfd, buf, 4, 0, 5000ULL);
+		gettimeofday(&tv, NULL);
+		written = send_bytes(con->sockfd, buf, 4, 0, end - utime(tv));
 		IO_CHECK(written, 4);
 
 		/* write seqnum */
 		encbe64(next_message->seq_num, buf);
-		/* limit seqnum writing to 10ms */
-		written = send_bytes(con->sockfd, buf, 8, 0, 10000ULL);
+		gettimeofday(&tv, NULL);
+		written = send_bytes(con->sockfd, buf, 8, 0, end - utime(tv));
 		IO_CHECK(written, 8);
 		/* write length */
 		encbe64(next_message->length, buf);
-		/* limit length writing to 10ms */
-		written = send_bytes(con->sockfd, buf, 8, 0, 10000ULL);
+		gettimeofday(&tv, NULL);
+		written = send_bytes(con->sockfd, buf, 8, 0, end - utime(tv));
 		IO_CHECK(written, 8);
 
-		/* leave 50ms to write the message, we don't want to take too
-		 * long */
+		gettimeofday(&tv, NULL);
 		written = send_bytes(con->sockfd, next_message->message,
-			next_message->length, 0, 50000ULL);
+			next_message->length, 0, end - utime(tv));
 		IO_CHECK(written, next_message->length);
 
 		/* write the hash */
-		written = send_bytes(con->sockfd, hash, 32, 0, 10000ULL);
+		gettimeofday(&tv, NULL);
+		written = send_bytes(con->sockfd, hash, 32, 0, end - utime(tv));
 		IO_CHECK(written, 32);
 
 		/* add the ack */
@@ -378,15 +394,21 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 	struct message *in_message;
 	uint64_t seq_num, length;
 
+	const uint64_t total_time = 1000000ULL;
+	uint64_t end;
 	struct timeval now;
 
-	received = read_bytes(con->sockfd, buf, 4, 0, 10000ULL);
+	gettimeofday(&now, NULL);
+	end = total_time + utime(now);
+
+	received = read_bytes(con->sockfd, buf, 4, 0, end - utime(now));
 	IO_CHECK(received, 4);
 
 	type = decbe32(buf);
 	switch(type) {
 	case 1: /* ACK */
-		received = read_bytes(con->sockfd, buf, 8, 0, 10000ULL);
+		gettimeofday(&now, NULL);
+		received = read_bytes(con->sockfd, buf, 8, 0, end - utime(now));
 		IO_CHECK(received, 8);
 		if(ack_map_rm(map, decbe64(buf)) == -1) {
 #ifdef PROTO_DEBUG
@@ -407,11 +429,13 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 #endif
 		break;
 	case 2: /* new message */
-		received = read_bytes(con->sockfd, buf, 8, 0, 10000ULL);
+		gettimeofday(&now, NULL);
+		received = read_bytes(con->sockfd, buf, 8, 0, end - utime(now));
 		IO_CHECK(received, 8);
 		seq_num = decbe64(buf);
 
-		received = read_bytes(con->sockfd, buf, 8, 0, 10000ULL);
+		gettimeofday(&now, NULL);
+		received = read_bytes(con->sockfd, buf, 8, 0, end - utime(now));
 		IO_CHECK(received, 8);
 		length = decbe64(buf);
 
@@ -422,11 +446,13 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 		in_message->seq_num = seq_num;
 		in_message->length = length;
 
+		gettimeofday(&now, NULL);
 		received = read_bytes(con->sockfd, in_message->message,
-			in_message->length, 0, 50000ULL);
+			in_message->length, 0, end - utime(now));
 		IO_CHECK(received, in_message->length);
 
-		received = read_bytes(con->sockfd, hash1, 32, 0, 10000ULL);
+		gettimeofday(&now, NULL);
+		received = read_bytes(con->sockfd, hash1, 32, 0, end - utime(now));
 		IO_CHECK(received, 32);
 
 		sha256(in_message->message, in_message->length, hash2);
@@ -564,7 +590,7 @@ static int write_keepalive(struct con_handle *con) {
 	ssize_t written;
 
 	encbe32(3, buf);
-	written = send_bytes(con->sockfd, buf, 4, 0, 5000ULL);
+	written = send_bytes(con->sockfd, buf, 4, 0, 100000ULL);
 	IO_CHECK(written, 4);
 
 	return 0;
@@ -577,11 +603,11 @@ static int write_acknowledge(struct con_handle *con, uint64_t seq_num) {
 	ssize_t written;
 
 	encbe32(1, buf);
-	written = send_bytes(con->sockfd, buf, 4, 0, 5000ULL);
+	written = send_bytes(con->sockfd, buf, 4, 0, 100000ULL);
 	IO_CHECK(written, 4);
 
 	encbe64(seq_num, buf);
-	written = send_bytes(con->sockfd, buf, 8, 0, 5000ULL);
+	written = send_bytes(con->sockfd, buf, 8, 0, 100000ULL);
 	IO_CHECK(written, 8);
 
 	return 0;

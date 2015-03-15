@@ -21,7 +21,7 @@
 /* don't import the whole file just for this */
 extern uint64_t utime(struct timeval tv);
 
-#define HANDSHAKE_DEBUG
+//#define HANDSHAKE_DEBUG
 
 #ifdef HANDSHAKE_DEBUG
 # define HS_TRACE() do { fprintf(stderr, "ERROR: %d\n", __LINE__); } while(0);
@@ -34,7 +34,7 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 	struct timeval tv;
 	uint64_t start;
 
-	const uint64_t total_time = 5000000ULL;
+	const uint64_t total_time = 10000000ULL;
 
 	struct message *client_m;
 	struct message *server_m;
