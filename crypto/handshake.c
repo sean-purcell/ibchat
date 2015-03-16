@@ -263,7 +263,8 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 
 	*res = 0;
 
-	init_m = get_message(con, 30000000ULL);
+	/* as long as the keep-alives keep coming, we'll keep waiting */
+	init_m = get_message(con, 0);
 	if(init_m == NULL) {
 		HS_TRACE();
 		return -1;

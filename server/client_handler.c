@@ -14,6 +14,7 @@
 #include "../crypto/crypto_layer.h"
 #include "../crypto/handshake.h"
 #include "../inet/message.h"
+#include "../util/defaults.h"
 
 struct handler_arg {
 	pthread_t thread;
@@ -80,6 +81,38 @@ static int init_client_handler(void *_arg, struct client_handler *handler) {
 	return 0;
 }
 
+/* indicates the number of handshakes occuring at the same time */
+int handshake_sem = 0;
+pthread_mutex_t hs_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t hs_cond = PTHREAD_COND_INITIALIZER;
+
+static int client_handler_handshake(struct con_handle *con, struct keyset *keys) {
+	int ret;
+
+	/* wait for a spot */
+	{
+		pthread_mutex_lock(&hs_mutex);
+		while(handshake_sem == MAX_HANDSHAKES) {
+			pthread_cond_wait(&hs_cond, &hs_mutex);
+		}
+		pthread_mutex_unlock(&hs_mutex);
+
+		handshake_sem++;
+	}
+
+	ret = server_handshake(con, &server_key, keys);
+
+	/* release our spot */
+	{
+		pthread_mutex_lock(&hs_mutex);
+		handshake_sem--;
+		pthread_cond_broadcast(&hs_cond);
+		pthread_mutex_unlock(&hs_mutex);
+	}
+
+	return ret;
+}
+
 static void destroy_client_handler(struct client_handler *handler) {
 	pthread_mutex_destroy(&handler->send_mutex);
 }
@@ -111,7 +144,7 @@ void *client_handler(void *_arg) {
 	}
 
 	/* complete the handshake */
-	if((ret = server_handshake(&con_handler, &server_key, &keys)) != 0) {
+	if((ret = client_handler_handshake(&con_handler, &keys)) != 0) {
 		printf("%d: failed to complete handshake: %d\n", handler.fd, ret);
 		goto err4;
 	}
@@ -122,6 +155,8 @@ void *client_handler(void *_arg) {
 
 	printf("%d: exiting\n", handler.fd);
 
+
+	memset(&keys, 0, sizeof(struct keyset));
 err4:
 	end_handler(&con_handler);
 	pthread_join(ch_thread, NULL);
