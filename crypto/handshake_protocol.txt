@@ -8,6 +8,12 @@ using i2osp, prefixed by the length as 8 big-endian bytes,
 and then used as the password for pbkdf2
 the salt is the empty string, and 1 iteration is used
 
+server->client
+0x000-0x009 "initiate\0"
+
+the client should wait for this message for at least 30 seconds before
+cancelling the handshake, as the server may be overloaded
+
 client->server
 	0x000-0x008 length of public key
 	0x008-0x108 g^b mod p

@@ -130,6 +130,7 @@ struct message *get_message(struct con_handle *con, uint64_t timeout) {
 		if(con->in_queue.size > 0) {
 			m = message_queue_pop(&con->in_queue);
 
+			pthread_mutex_unlock(&con->in_mutex);
 			goto exit;
 		}
 		pthread_mutex_unlock(&con->in_mutex);

@@ -69,6 +69,9 @@ int main(int argc, char **argv) {
 			fprintf(stderr,
 				"server provided invalid key hash\n");
 			break;
+		case INVALID_INIT:
+			fprintf(stderr,
+				"server provided invalid initiation message\n");
 		}
 
 		goto ehandshake;

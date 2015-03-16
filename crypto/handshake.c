@@ -29,6 +29,8 @@ extern uint64_t utime(struct timeval tv);
 # define HS_TRACE() do { } while(0);
 #endif
 
+const char *init = "initiate";
+
 int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *keys) {
 	/* measure our starting time, we allow maximum 5 seconds for this */
 	struct timeval tv;
@@ -36,6 +38,7 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 
 	const uint64_t total_time = 10000000ULL;
 
+	struct message *init_m;
 	struct message *client_m;
 	struct message *server_m;
 
@@ -67,6 +70,15 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 	uint64_t sig_size;
 
 	int ret;
+
+	init_m = alloc_message(strlen(init) + 1);
+	if(init_m == NULL) {
+		HS_TRACE();
+		return -1;
+	}
+	memcpy(init_m->message, init, init_m->length);
+	add_message(con, init_m);
+	init_m = NULL;
 
 	gettimeofday(&tv, NULL);
 	start = utime(tv);
@@ -221,6 +233,7 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 
 	const uint64_t total_time = 10000000ULL;
 
+	struct message *init_m;
 	struct message *client_m;
 	struct message *server_m;
 
@@ -249,6 +262,17 @@ int client_handshake(struct con_handle *con, RSA_PUBLIC_KEY *server_rsa_key, str
 	int ret;
 
 	*res = 0;
+
+	init_m = get_message(con, 30000000ULL);
+	if(init_m == NULL) {
+		HS_TRACE();
+		return -1;
+	}
+	if(memcmp(init_m->message, init, strlen(init) + 1) != 0) {
+		HS_TRACE();
+		return INVALID_INIT;
+	}
+	free_message(init_m);
 
 	gettimeofday(&tv, NULL);
 	start = utime(tv);
