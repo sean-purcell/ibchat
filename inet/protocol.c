@@ -21,7 +21,7 @@
 
 //#define PROTO_DEBUG
 
-#define WAIT_TIMEOUT (50000)
+#define WAIT_TIMEOUT (500000)
 #define ACK_WAITTIME (5000000ULL)
 
 #define INBUF_SIZE (4096)
@@ -40,7 +40,7 @@
 }
 #endif
 
-#define ACK_MAP_MASK 0xff
+#define ACK_MAP_MASK 0xf
 #define ACK_MAP_FAIL ((uint64_t)-1)
 
 struct ack_map_el;
