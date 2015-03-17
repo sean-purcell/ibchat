@@ -76,6 +76,7 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 		HS_TRACE();
 		return -1;
 	}
+	init_m->seq_num = 0;
 	memcpy(init_m->message, init, init_m->length);
 	add_message(con, init_m);
 	init_m = NULL;
@@ -152,7 +153,7 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 	zfree(dh_secret_buf, dh_secret_size);
 
 	expand_keyset(key_buf, 1, keys);
-	keys->nonce = 1;
+	keys->nonce = 2;
 
 	/* hash the keybuf */
 	sha256(key_buf, 128, hash);
@@ -168,6 +169,8 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 		HS_TRACE();
 		return -1;
 	}
+
+	server_m->seq_num = 1;
 
 	response = server_m->message;
 
