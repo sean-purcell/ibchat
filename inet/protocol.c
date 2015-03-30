@@ -41,7 +41,6 @@
 #endif
 
 #define ACK_MAP_MASK 0xf
-#define ACK_MAP_FAIL ((uint64_t)-1)
 
 struct ack_map_el;
 struct ack_map {

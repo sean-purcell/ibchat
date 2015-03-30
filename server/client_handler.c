@@ -148,9 +148,11 @@ void *client_handler(void *_arg) {
 		printf("%d: failed to complete handshake: %d\n", handler.fd, ret);
 		goto err4;
 	}
+	printf("%d: successfully completed handshake\n", handler.fd);
+
+	/* identify the user we're talking to */
 
 	/* thats it for now, sleep for a bit and then exit */
-	printf("%d: successfully completed handshake\n", handler.fd);
 	sleep(5);
 
 	printf("%d: exiting\n", handler.fd);
