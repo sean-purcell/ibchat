@@ -6,6 +6,8 @@ struct user {
 
 };
 
+char *getusername(const char *prompt, FILE *out);
+
 /* usernames must match /[a-zA-Z0-9_]+/ */
 
 int valid_uname(char *uname, size_t ulen);

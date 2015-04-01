@@ -1,4 +1,6 @@
+#include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <ibcrypt/sha256.h>
 #include <ibcrypt/zfree.h>
@@ -23,6 +25,36 @@ int valid_uname(char *uname, size_t ulen) {
 	}
 
 	return !invalid;
+}
+
+char *getusername(const char *prompt, FILE *out) {
+	if(prompt == NULL) {
+		prompt = "username";
+	}
+	if(out == NULL) {
+		out = stdout;
+	}
+
+	char *username = NULL;
+	size_t size;
+
+	do {
+		size = 0;
+		free(username);
+		username = NULL;
+
+		fprintf(out, "%s: ", prompt);
+		if(getline(&username, &size, stdin) == -1) {
+			return NULL;
+		}
+		size = strlen(username) - 1;
+		username[size] = '\0';
+		if(!valid_uname(username, size)) {
+			fprintf(out, "invalid username\n");
+		}
+	} while(!valid_uname(username, size));
+
+	return username;
 }
 
 void gen_uid(char *uname, size_t ulen, uint8_t uid[32]) {
