@@ -101,10 +101,7 @@ static int write_pri_key_password(uint8_t *key, uint64_t key_size, FILE *out, ch
 		goto err;
 	}
 
-	if(chacha_enc(enc_key, 32, 0, key, key, key_size) != 0) {
-		ret = CRYPTOGRAPHY_FAIL;
-		goto err;
-	}
+	chacha_enc(enc_key, 32, 0, key, key, key_size);
 
 	hmac_sha256(mac_key, 32, key, key_size, macbuf);
 
@@ -308,10 +305,7 @@ static int read_pri_key_password(RSA_KEY *key, uint8_t **buf, uint64_t *bufsize,
 		goto err;
 	}
 
-	if(chacha_dec(enc_key, 32, 0, *buf, *buf, size) != 0) {
-		ret = CRYPTOGRAPHY_FAIL;
-		goto err;
-	}
+	chacha_dec(enc_key, 32, 0, *buf, *buf, size);
 
 	ret = 0;
 

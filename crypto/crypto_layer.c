@@ -26,10 +26,7 @@ struct message *encrypt_message(struct keyset *keys, uint8_t *ptext, uint64_t pl
 	m->seq_num = keys->nonce;
 
 	encbe64(keys->nonce, m->message);
-	if(chacha_enc(keys->send_symm_key, 32, keys->nonce, ptext, &m->message[8], plen) != 0) {
-		free_message(m);
-		return NULL;
-	}
+	chacha_enc(keys->send_symm_key, 32, keys->nonce, ptext, &m->message[8], plen);
 	hmac_sha256(keys->send_hmac_key, 32, m->message, plen + 8, &m->message[8 + plen]);
 
 	keys->nonce++;
@@ -59,10 +56,7 @@ int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out, uint64
 
 	nonce = decbe64(m->message);
 
-	if(chacha_dec(keys->recv_symm_key, 32, nonce, &m->message[8], out, plen) != 0) {
-		return -1;
-	}
-
+	chacha_dec(keys->recv_symm_key, 32, nonce, &m->message[8], out, plen);
 	return 0;
 }
 
