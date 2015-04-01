@@ -1,3 +1,4 @@
 DIR=client
-CLIENTSOURCES+=$(patsubst %,$(DIR)/%, client_shake_test.c)
+FILTER=$(wildcard */*_test.c)
+CLIENTSOURCES+=$(filter-out $(FILTER),$(wildcard $(DIR)/*.c)) $(DIR)/client_shake_test.c
 

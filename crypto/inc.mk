@@ -1,3 +1,4 @@
 DIR=crypto
-SOURCES+=$(patsubst %,$(DIR)/%,crypto_layer.c handshake.c keyfile.c)
+FILTER=$(wildcard */*_test.c)
+SOURCES+=$(filter-out $(FILTER),$(wildcard $(DIR)/*.c))
 

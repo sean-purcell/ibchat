@@ -1,3 +1,4 @@
 DIR=inet
-SOURCES+=$(patsubst %,$(DIR)/%,protocol.c connect.c message.c)
+FILTER=$(wildcard */*_test.c)
+SOURCES+=$(filter-out $(FILTER),$(wildcard $(DIR)/*.c))
 
