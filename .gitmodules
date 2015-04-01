@@ -4,6 +4,3 @@
 [submodule "libibur"]
 	path = libibur
 	url = https://github.com/iburinoc/libibur
-[submodule "inet/libibur"]
-	path = inet/libibur
-	url = https://github.com/iburinoc/libibur
