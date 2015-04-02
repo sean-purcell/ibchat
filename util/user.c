@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <ibcrypt/sha256.h>
 #include <ibcrypt/zfree.h>
@@ -31,9 +32,6 @@ char *getusername(const char *prompt, FILE *out) {
 	if(prompt == NULL) {
 		prompt = "username";
 	}
-	if(out == NULL) {
-		out = stdout;
-	}
 
 	char *username = NULL;
 	size_t size;
@@ -43,14 +41,18 @@ char *getusername(const char *prompt, FILE *out) {
 		free(username);
 		username = NULL;
 
-		fprintf(out, "%s: ", prompt);
+		if(out != NULL && isatty(fileno(stdin))) {
+			fprintf(out, "%s: ", prompt);
+		}
 		if(getline(&username, &size, stdin) == -1) {
 			return NULL;
 		}
 		size = strlen(username) - 1;
 		username[size] = '\0';
 		if(!valid_uname(username, size)) {
-			fprintf(out, "invalid username\n");
+			if(out != NULL && isatty(fileno(stdin))) {
+				fprintf(out, "invalid username\n");
+			}
 		}
 	} while(!valid_uname(username, size));
 

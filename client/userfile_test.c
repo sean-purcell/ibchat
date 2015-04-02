@@ -26,7 +26,7 @@ int main() {
 		return 1;
 	}
 
-	username = getusername(NULL, NULL);
+	username = getusername(NULL, stdout);
 	password = ibchat_getpass("password", NULL, 0);
 	if(username == NULL || password == NULL) {
 		fprintf(stderr, "failed to read username or password\n");

@@ -33,7 +33,7 @@ char* ibchat_getpass(const char* prompt, const char* confprompt, int usetty) {
 			goto err0;
 		}
 	}
-	ttyout = isatty(fileno(stdout));
+	ttyout = isatty(fileno(stdout)) && isatty(fileno(in));
 
 tryagain:
 	if(ttyout) {
