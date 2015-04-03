@@ -43,6 +43,7 @@ int main() {
 
 	char *secret2 = "this is my secret.  there are many like it, like the one you just saw.";
 	m = encrypt_message(&skey, (uint8_t*)secret2, strlen(secret2) + 1);
+	skey.nonce++;
 
 	if(m == NULL) {
 		printf("FAILED :C\n");

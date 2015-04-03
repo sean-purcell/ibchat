@@ -9,6 +9,7 @@
 #include <libibur/endian.h>
 
 #include "../inet/message.h"
+#include "../inet/protocol.h"
 
 #include "crypto_layer.h"
 
@@ -28,8 +29,6 @@ struct message *encrypt_message(struct keyset *keys, uint8_t *ptext, uint64_t pl
 	encbe64(keys->nonce, m->message);
 	chacha_enc(keys->send_symm_key, 32, keys->nonce, ptext, &m->message[8], plen);
 	hmac_sha256(keys->send_hmac_key, 32, m->message, plen + 8, &m->message[8 + plen]);
-
-	keys->nonce++;
 
 	return m;
 }
@@ -58,6 +57,42 @@ int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out, uint64
 
 	chacha_dec(keys->recv_symm_key, 32, nonce, &m->message[8], out, plen);
 	return 0;
+}
+
+int send_message(struct con_handle *con, struct keyset *keys, uint8_t *ptext, uint64_t plen) {
+	struct message *m = encrypt_message(keys, ptext, plen);
+	if(m == NULL) {
+		return -1;
+	}
+
+	keys->nonce++;
+
+	add_message(con, m);
+
+	return 0;
+}
+
+struct message *recv_message(struct con_handle *con, struct keyset *keys, uint64_t timeout) {
+	errno = 0;
+	struct message *m = get_message(con, timeout);
+	if(m == NULL) {
+		return m;
+	}
+
+	struct message *m_pt = alloc_message(m->length - 40);
+	if(m_pt == NULL) {
+		return NULL;
+	}
+
+	if(decrypt_message(keys, m, m_pt->message, m_pt->length) != 0) {
+		free_message(m_pt);
+		free_message(m);
+		return NULL;
+	}
+
+	free_message(m);
+
+	return m;
 }
 
 /* type: 0=client, 1=server */
