@@ -1,0 +1,10 @@
+ibchat_files/
+	<uid in hex>/
+		userfile.ibc      // file containing encrypted user data and id
+		outstanding.ibc   // messages to be sent to the server that have not been sent yet
+		friends.ibc       // list of friend usernames and their associated friend filenames
+		preferences.ibc   // list of preferences
+		data/
+			<friendfile>.ibc   // contains friend's public key and list of conversation file/key pairs
+			<conversation>.ibc // contains archived conversations
+

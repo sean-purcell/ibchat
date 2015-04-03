@@ -1,0 +1,29 @@
+authorization protocol for users joining the server:
+====================================================
+
+server->client:
+0x00-0x20 random numbers, for the user challenge
+
+client->server:
+0x000-0x020 uid
+0x020-0x130 public key
+0x130-0x150 challenge numbers from the server
+0x150-0x250 signature of 0x000-0x150
+
+server->client:
+0x00-0x07 "cliauth"
+0x07-0x08 0, 1, 2
+
+0:
+	logged in
+1:
+	not-registered, respond as below to register
+2:
+	user exists with different public key
+
+if the signature is invalid, end the connection with no response
+
+if responded with 1:
+client->server:
+0x00-0x08 "register"
+
