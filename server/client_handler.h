@@ -7,10 +7,9 @@
 
 struct client_handler {
 	pthread_t thread;
-	uint64_t id;
 
 	int fd;
-	uint32_t userid[32];
+	uint8_t id[32];
 	struct message_queue send_queue;
 	pthread_mutex_t send_mutex;
 
@@ -22,10 +21,9 @@ int spawn_handler(int fd);
 
 int init_handler_table();
 void destroy_handler_table();
-struct client_handler *get_handler(uint64_t id);
+struct client_handler *get_handler(uint8_t* id);
 int add_handler(struct client_handler *handler);
-int rem_handler(uint64_t id);
-	
+int rem_handler(uint8_t* id);
 
 #endif
 
