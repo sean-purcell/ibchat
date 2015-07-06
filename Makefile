@@ -8,7 +8,7 @@ ifeq ($(NO-OPTIMIZE),1)
 else
 	CFLAGS+=-O3
 endif
-LINKFLAGS=
+LINKFLAGS= -pthread
 
 LIBINC=-I libibur/bin -I ibcrypt/bin/include -pthread
 LIBS=-Libcrypt/bin -libcrypt

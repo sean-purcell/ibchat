@@ -1,12 +1,14 @@
 #ifndef IBCHAT_UTIL_DEFAULTS_H
 #define IBCHAT_UTIL_DEFAULTS_H
 
+/* VALUES FOUND IN DEFAULTS.C */
+
 /* the maximum number of handshakes a server can run at the same time */
-static const int MAX_HANDSHAKES = 1;
+extern const int MAX_HANDSHAKES;
 
-static char *DFLT_PORT = "41032";
+extern char *DFLT_PORT;
 
-static char *DFLT_ROOT_DIR = "~/ibchat_server/";
+extern char *DFLT_ROOT_DIR;
 
 #endif
 
