@@ -65,11 +65,6 @@ int chat_server(int argc, char **argv) {
 
 	password = NULL;
 	memset(&server_key, 0, sizeof(RSA_KEY));
-	if(init_handler_table() != 0) {
-		fprintf(stderr, "failed to initialize handler table: %s\n",
-			strerror(errno));
-		return 1;
-	}
 
 	if(opts.use_password) {
 		password = ibchat_getpass("Server password", NULL, 1);
@@ -121,6 +116,12 @@ err1:
 int handle_connections(int server_socket) {
 	stop = 0;
 
+	if(init_handler_table() != 0) {
+		fprintf(stderr, "failed to initialize handler table: %s\n",
+			strerror(errno));
+		return 1;
+	}
+
 	fd_set rd_set;
 	struct timeval timeout;
 
@@ -149,6 +150,8 @@ int handle_connections(int server_socket) {
 			}
 		}
 	}
+
+	
 
 	return 0;
 err:

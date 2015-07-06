@@ -117,8 +117,29 @@ static void destroy_client_handler(struct client_handler *handler) {
 	pthread_mutex_destroy(&handler->send_mutex);
 }
 
+/* client handler cleanup */
+struct ch_manager {
+	struct con_handle handler;
+	pthread_t thread;
+};
+
+void *ch_cleanup_end_handler(void *_arg) {
+	struct ch_manager *arg = (struct ch_manager *)_arg;
+
+	end_handler(&arg->handler);
+	pthread_join(&arg->thread, NULL);
+
+	return NULL;
+}
+
 void *client_handler(void *_arg) {
 	struct client_handler handler;
+	struct ch_manager con_handler;
+	pthread_t ch_thread;
+	struct keyset keys;
+
+	int ret;
+
 	if(init_client_handler(_arg, &handler) != 0) {
 		fprintf(stderr, "%d: failed to initialize client handler structure\n",
 			((struct handler_arg *)_arg)->fd);
@@ -130,21 +151,16 @@ void *client_handler(void *_arg) {
 		goto err2;
 	}
 
-	int ret;
-
-	struct con_handle con_handler;
-	pthread_t ch_thread;
-	struct keyset keys;
-
 	/* initiate the connection handler thread */
 	init_handler(&con_handler, handler.fd);
 	if(launch_handler(&ch_thread, &con_handler) != 0) {
 		fprintf(stderr, "%d: failed to launch handler thread\n", handler.fd);
 		goto err3;
 	}
+	pthread_cleanup_push(ch_cleanup_end_handler, &con_handler);
 
 	/* complete the handshake */
-	if((ret = client_handler_handshake(&con_handler, &keys)) != 0) {
+	if((ret = client_handler_handshake(&con_handler.handler, &keys)) != 0) {
 		printf("%d: failed to complete handshake: %d\n", handler.fd, ret);
 		goto err4;
 	}
@@ -160,8 +176,7 @@ void *client_handler(void *_arg) {
 
 	memset(&keys, 0, sizeof(struct keyset));
 err4:
-	end_handler(&con_handler);
-	pthread_join(ch_thread, NULL);
+	pthread_cleanup_pop(1);
 err3:
 	destroy_handler(&con_handler);
 	if(rem_handler(handler.id) != 0) {

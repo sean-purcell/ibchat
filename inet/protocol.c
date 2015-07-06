@@ -21,7 +21,7 @@
 
 //#define PROTO_DEBUG
 
-#define WAIT_TIMEOUT (500000)
+#define WAIT_TIMEOUT (1000000ULL)
 #define ACK_WAITTIME (5000000ULL)
 
 #define INBUF_SIZE (4096)
@@ -66,6 +66,14 @@ static int acknowledge_add(struct ack_map *map, uint64_t seq_num);
 
 uint64_t utime(struct timeval tv) {
 	return (uint64_t)tv.tv_sec * 1000000ULL + (uint64_t)tv.tv_usec;
+}
+
+struct timeval tvtime(uint64_t utime) {
+	struct timeval tv;
+	tv.tv_sec = utime / 1000000ULL;
+	tv.tv_usec = utime % 1000000ULL;
+
+	return tv;
 }
 
 int launch_handler(pthread_t *thread, struct con_handle *con) {
@@ -197,8 +205,7 @@ void *handle_connection(void *_con) {
 		FD_ZERO(&wset);
 		FD_SET(con->sockfd, &rset);
 		FD_SET(con->sockfd, &wset);
-		select_wait.tv_sec = 0;
-		select_wait.tv_usec = WAIT_TIMEOUT;
+		select_wait = tvtime(WAIT_TIMEOUT);
 
 		if(select(FD_SETSIZE, &rset, &wset, NULL, &select_wait) == -1) {
 #ifdef PROTO_DEBUG
@@ -501,8 +508,7 @@ static ssize_t send_bytes(int fd, void *buf, size_t len, int flags, uint64_t tim
 	do {
 		FD_ZERO(&wset);
 		FD_SET(fd, &wset);
-		wait.tv_sec = 0;
-		wait.tv_usec = WAIT_TIMEOUT < timeout ? WAIT_TIMEOUT : timeout;
+		wait = tvtime(timeout < WAIT_TIMEOUT ? timeout : WAIT_TIMEOUT);
 
 		if(select(FD_SETSIZE, NULL, &wset, NULL, &wait) == -1) {
 #ifdef PROTO_DEBUG
@@ -551,8 +557,7 @@ static ssize_t read_bytes(int fd, void *buf, size_t len, int flags, uint64_t tim
 	do {
 		FD_ZERO(&rset);
 		FD_SET(fd, &rset);
-		wait.tv_sec = 0;
-		wait.tv_usec = WAIT_TIMEOUT < timeout ? WAIT_TIMEOUT : timeout;
+		wait = tvtime(timeout < WAIT_TIMEOUT ? timeout : WAIT_TIMEOUT);
 
 		if(select(FD_SETSIZE, &rset, NULL, NULL, &wait) == -1) {
 #ifdef PROTO_DEBUG

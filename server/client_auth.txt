@@ -12,13 +12,15 @@ client->server:
 
 server->client:
 0x00-0x07 "cliauth"
-0x07-0x08 0, 1, 2
+0x07-0x08 0, 1, 2, 3
 
 0:
 	logged in
 1:
 	not-registered, respond as below to register
 2:
+	user already logged in
+3:
 	user exists with different public key
 
 if the signature is invalid, end the connection with no response
