@@ -8,6 +8,8 @@
 
 #include <ibcrypt/rand.h>
 
+#include <libibur/endian.h>
+
 #include "client_handler.h"
 #include "chat_server.h"
 
@@ -44,30 +46,11 @@ int spawn_handler(int fd) {
 	return 0;
 }
 
-static uint64_t gen_handler_id() {
-	uint64_t id;
-	errno = 0;
-	do {
-		if(cs_rand_uint64(&id) != 0) {
-			return 0;
-		}
-	} while(get_handler(id) != NULL);
-
-	return id;
-}
-
 static int init_client_handler(void *_arg, struct client_handler *handler) {
 	struct handler_arg *arg = (struct handler_arg *)_arg;
 
 	handler->fd = arg->fd;
 	handler->thread = arg->thread;
-
-	/* generate an unused id */
-	handler->id = gen_handler_id();
-	if(errno != 0) {
-		/* error occured */
-		return -1;
-	}
 
 	/* initialize the send queue and send mutex */
 	if(pthread_mutex_init(&handler->send_mutex, NULL) != 0) {
@@ -123,14 +106,14 @@ struct ch_manager {
 	pthread_t thread;
 };
 
-void *ch_cleanup_end_handler(void *_arg) {
+void ch_cleanup_end_handler(void *_arg) {
 	struct ch_manager *arg = (struct ch_manager *)_arg;
 
 	end_handler(&arg->handler);
-	pthread_join(&arg->thread, NULL);
-
-	return NULL;
+	pthread_join(arg->thread, NULL);
 }
+
+int begin_interaction(struct client_handler *cli_hndl, struct con_handle *con_hndl, struct keyset *keys);
 
 void *client_handler(void *_arg) {
 	struct client_handler handler;
@@ -146,27 +129,23 @@ void *client_handler(void *_arg) {
 		goto err1;
 	}
 
-	if(add_handler(&handler) != 0) {
-		fprintf(stderr, "%d: failed to add handler to table\n", handler.fd);
-		goto err2;
-	}
-
 	/* initiate the connection handler thread */
-	init_handler(&con_handler, handler.fd);
-	if(launch_handler(&ch_thread, &con_handler) != 0) {
+	init_handler(&con_handler.handler, handler.fd);
+	if(launch_handler(&ch_thread, &con_handler.handler) != 0) {
 		fprintf(stderr, "%d: failed to launch handler thread\n", handler.fd);
-		goto err3;
+		goto err2;
 	}
 	pthread_cleanup_push(ch_cleanup_end_handler, &con_handler);
 
 	/* complete the handshake */
 	if((ret = client_handler_handshake(&con_handler.handler, &keys)) != 0) {
 		printf("%d: failed to complete handshake: %d\n", handler.fd, ret);
-		goto err4;
+		goto err3;
 	}
 	printf("%d: successfully completed handshake\n", handler.fd);
 
-	/* identify the user we're talking to */
+	/* now we can start communicating with this user */
+	begin_interaction(&handler, &con_handler.handler, &keys);
 
 	/* thats it for now, sleep for a bit and then exit */
 	sleep(5);
@@ -175,20 +154,116 @@ void *client_handler(void *_arg) {
 
 
 	memset(&keys, 0, sizeof(struct keyset));
-err4:
-	pthread_cleanup_pop(1);
 err3:
-	destroy_handler(&con_handler);
-	if(rem_handler(handler.id) != 0) {
-		fprintf(stderr, "%d: the handler table has been corrupted\n", handler.fd);
-	}
+	pthread_cleanup_pop(1);
 err2:
+	destroy_handler(&con_handler.handler);
 	destroy_client_handler(&handler);
 err1:
 	return NULL;
 }
 
+int begin_interaction(struct client_handler *cli_hndl, struct con_handle *con_hndl, struct keyset *keys) {
+#define ERR(x) fprintf(stderr, "%d: %s\n", cli_hndl->fd, x)
+
+	uint8_t challenge[0x20];
+
+	struct message *cli_response;
+
+	uint8_t uid[0x20];
+	RSA_PUBLIC_KEY pb_key;
+
+	/* generate 256 bit challenge numbers and send them */
+	{
+		if(cs_rand(challenge, 0x20) != 0) {
+			/* failed to generate random numbers, we should exit */
+			/* TODO: make this more severe */
+			ERR("generating random numbers failed, exit ASAP");
+			goto err1;
+		}
+
+		if(send_message(con_hdnl, keys, challenge, 0x20) != 0) {
+			ERR("failed to allocate message");
+			goto err1;
+		}
+	}
+
+	/* now we wait for the response */
+	/* we shouldn't wait more than 10 seconds, the client shouldn't be busy */
+
+	/* handle response */
+	{
+		cli_response = recv_message(con_hndl, keys, 10000000ULL);
+
+		uint8_t *pb_key_bin = &cli_response->message[0x20];
+		uint64_t keylen = rsa_pubkey_size(decbe64(pb_key_bin));
+
+		if(0x20 + keylen + 0x20 + 0x08 >= cli_response->length) {
+			/* invalid message, exit now */
+			ERR("invalid length message");
+			goto err2;
+		}
+
+		/* check the challenge bits */
+		uint8_t *challenge_cli = &cli_response->message[0x20 + keylen];
+
+		if(memcmp_ct(challenge, challenge_cli, 0x20) != 0) {
+			ERR("invalid challenge bytes");
+			goto err2;
+		}
+
+		uint8_t *sig_bin = &cli_response->message[0x20 + keylen + 0x20 + 0x08];
+		uint64_t siglen = decbe64(&cli_response->message[0x20 + keylen + 0x20]);
+
+		if(0x20 + keylen + 0x20 + 0x08 + siglen != cli_response->length) {
+			/* invalid message, exit now */
+			ERR("invalid length message");
+			goto err2;
+		}
+
+		/* now parse the public key */
+		if(rsa_wire2pubkey(pb_key_bin, keylen, &pbkey) != 0) {
+			/* failed to read key, we should exit */
+			ERR("failed to read public key");
+			goto err2;
+		}
+
+		/* now check the signature */
+		int valid = 0;
+		rsa_pss_verify(&pb_key, sig_bin, siglen, cli_response->message, 0x20 + keylen + 0x08, &valid);
+
+		if(!valid) {
+			ERR("invalid signature");
+			goto err3;
+		}
+
+		memcpy(uid, cli_response->message, 0x20);
+	}
+
+	/* now we have a uid and public key, identify this user */
+	int ret = check_user(uid, &pb_key);
+
+	memset(challenge, 0, sizeof(challenge));
+	memset(uid, 0, sizeof(uid));
+
+	rsa_free_pubkey(&pb_key);
+	free_message(cli_response);
+
+	return 0;
+
+err3:
+	rsa_free_pubkey(&pb_key);
+err2:
+	free_message(cli_response);
+err1:
+	memset(challenge, 0, sizeof(challenge));
+	memset(uid, 0, sizeof(uid));
+	return -1;
+}
+
 /* handler table data structure */
+/* this table is used as a way to find the handler
+ * associated with a given user to deliver them a message */
 #define TOP_LOAD (0.75)
 #define BOT_LOAD (0.5 / 2)
 
@@ -210,6 +285,13 @@ struct handler_table {
 	pthread_cond_t use_state_cond;
 	int use_state;
 } ht;
+
+static uint64_t hash_id(uint8_t *id) {
+	return  decbe64(&id[ 0]) ^
+		decbe64(&id[ 8]) ^
+		decbe64(&id[16]) ^
+		decbe64(&id[24]);
+}
 
 static void ht_acquire_readlock() {
 	pthread_mutex_lock(&ht.use_state_mutex);
@@ -268,9 +350,9 @@ static int resize_handler_table(uint64_t nsize) {
 		while(cur != NULL) {
 			next = cur->next;
 
-			uint64_t index = cur->id % nsize;
+			uint64_t index = hash_id(cur->id) % nsize;
 			cur->next = nbuckets[index];
-			nbuckets[cur->id % nsize] = cur;
+			nbuckets[hash_id(cur->id) % nsize] = cur;
 
 			cur = next;
 		}
@@ -310,10 +392,10 @@ void destroy_handler_table() {
 	pthread_mutex_destroy(&ht.use_state_mutex);
 }
 
-struct client_handler *get_handler(uint64_t id) {
+struct client_handler *get_handler(uint8_t* id) {
 	ht_acquire_readlock();
 
-	uint64_t index = id % ht.size;
+	uint64_t index = hash_id(id) % ht.size;
 	struct client_handler *cur = ht.buckets[index];
 
 	while(cur != NULL) {
@@ -332,7 +414,7 @@ exit:
 int add_handler(struct client_handler *handler) {
 	ht_acquire_writelock();
 
-	uint64_t index = handler->id % ht.size;
+	uint64_t index = hash_id(handler->id) % ht.size;
 	struct client_handler **loc = &ht.buckets[index];
 
 	int ret = 0;
@@ -362,10 +444,10 @@ exit:
 	return ret;
 }
 
-int rem_handler(uint64_t id) {
+int rem_handler(uint8_t* id) {
 	ht_acquire_writelock();
 
-	uint64_t index = id % ht.size;
+	uint64_t index = hash_id(id) % ht.size;
 	struct client_handler **loc = &ht.buckets[index];
 
 	int ret = 0;

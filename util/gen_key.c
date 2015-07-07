@@ -1,9 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdint.h>
 #include <string.h>
 #include <limits.h>
 #include <errno.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #include <ibcrypt/bignum.h>
 #include <ibcrypt/rsa.h>
@@ -39,8 +40,8 @@ int gen_key(int argc, char **argv) {
 		return 1;
 	}
 
-	fprintf(stderr, "generating %llu bit rsa key with a public exponent of"
-	                " %llu\n", bits, exp);
+	fprintf(stderr, "generating %" PRIu64 " bit rsa key with a public exponent of"
+	                " %" PRIu64 "\n", bits, exp);
 
 	RSA_KEY key;
 	RSA_PUBLIC_KEY pkey;

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include <ibcrypt/rsa.h>
 #include <ibcrypt/rsa_util.h>
@@ -12,8 +13,7 @@
 #include "../crypto/handshake.h"
 #include "../crypto/crypto_layer.h"
 #include "../inet/connect.h"
-
-#define PORT "41032"
+#include "../util/defaults.h"
 
 int main(int argc, char **argv) {
 	signal(SIGPIPE, SIG_IGN);
@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
 
 	struct sock server;
 
-	server = client_connect(argv[1], PORT);
+	server = client_connect(argv[1], DFLT_PORT);
 	if(server.fd == -1) {
 		if(errno == 0) {
 			fprintf(stderr, "getaddrinfo failed\n");

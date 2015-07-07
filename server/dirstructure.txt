@@ -1,4 +1,6 @@
-ibchat_server_files/
+root_dir/
 	server_prikey.ibcs // file containing the server's private key
-	users.ibcs         // contains a listing of uids, private keys, signatures, and undelivered file
-	<undelivered>.ibcs // file containing outstanding messages for a given user
+	users/
+		<uidhash>.ibcs     // file containing the user's id, public key, and name of their undelivered file
+	undelivered/
+		<undname>.ibcs     // file containing messages that must be delivered to a user

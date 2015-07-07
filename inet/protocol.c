@@ -518,7 +518,7 @@ static ssize_t send_bytes(int fd, void *buf, size_t len, int flags, uint64_t tim
 			goto error;
 		}
 
-		written = send(fd, &buf[total], len - total, flags | MSG_DONTWAIT);
+		written = send(fd, buf + total, len - total, flags | MSG_DONTWAIT);
 		if(written == -1) {
 			if(errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
 #ifdef PROTO_DEBUG
@@ -567,7 +567,7 @@ static ssize_t read_bytes(int fd, void *buf, size_t len, int flags, uint64_t tim
 			goto error;
 		}
 
-		received = recv(fd, &buf[total], len - total, flags | MSG_DONTWAIT);
+		received = recv(fd, buf + total, len - total, flags | MSG_DONTWAIT);
 		if(received == -1) {
 			if(errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
 #ifdef PROTO_DEBUG
