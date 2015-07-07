@@ -22,6 +22,10 @@ struct connection {
 
 struct message *encrypt_message(struct keyset *keys, uint8_t *ptext, uint64_t plen);
 int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out, uint64_t outlen);
+
+int send_message(struct con_handle *con, struct keyset *keys, uint8_t *ptext, uint64_t plen);
+struct message *recv_message(struct con_handle *con, struct keyset *keys, uint64_t timeout);
+
 void expand_keyset(uint8_t *keybuf, int type, struct keyset *keys);
 
 #endif

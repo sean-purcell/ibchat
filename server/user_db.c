@@ -3,6 +3,9 @@
 
 #include <pthread.h>
 #include <stdint.h>
+#include <string.h>
+
+#include <libibur/endian.h>
 
 #include <ibcrypt/sha256.h>
 
@@ -14,7 +17,7 @@
 
 #define MAX_READERS INT_MAX - 1
 
-static const char *USER_DIR = "users"
+static const char *USER_DIR = "users";
 
 struct user_db_ent {
 	struct user;
@@ -22,7 +25,7 @@ struct user_db_ent {
 };
 
 struct user_db_st {
-	user_db_ent **buckets;
+	struct user_db_ent **buckets;
 	uint64_t size;
 
 	uint64_t elements;
@@ -73,5 +76,8 @@ int init_user_db() {
 	}
 
 	/* add all existing user files */
+
+
+	return 0;
 }
 
