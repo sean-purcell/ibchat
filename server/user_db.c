@@ -2,10 +2,13 @@
 /* see dirstructure.txt */
 
 #include <dirent.h>
+#include <errno.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+
+#include <sys/stat.h>
 
 #include <libibur/endian.h>
 
@@ -23,8 +26,12 @@ static const char *USER_DIR_SUFFIX = "users/";
 
 static char *USER_DIR;
 
+struct user {
+
+};
+
 struct user_db_ent {
-	struct user;
+	struct user u;
 	struct user_db_ent *next;
 };
 
@@ -73,7 +80,35 @@ static int init_user_db_st() {
 	return 0;
 }
 
+static int check_user_dir() {
+	struct stat st = {0};
+	if(stat(USER_DIR, &st) == -1) {
+		if(errno != ENOENT) {
+			fprintf(stderr, "failed to open user directory: %s\n", USER_DIR);
+			return -1;
+		}
+
+		/* directory doesn't exist, create it */
+		if(mkdir(USER_DIR, 0700) != 0) {
+			fprintf(stderr, "failed to create user directory: %s\n", USER_DIR);
+			return -1;
+		}
+	} else {
+		/* make sure its a directory */
+		if(!S_ISDIR(st.st_mode)) {
+			fprintf(stderr, "specified user directory is not a directory: %s\n", USER_DIR);
+			return -1;
+		}
+	}
+	return 0;
+}
+
 static int load_user_files() {
+	if(check_user_dir() != 0) {
+		return 1;
+	}
+
+
 	DIR *userdir = NULL;
 
 	userdir = opendir(USER_DIR);

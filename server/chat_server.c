@@ -11,6 +11,7 @@
 #include <sys/select.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 
 #include <ibcrypt/rsa.h>
 #include <ibcrypt/zfree.h>
@@ -22,7 +23,7 @@
 #include "../util/getpass.h"
 #include "../util/defaults.h"
 
-/* central operating info */
+/* private info */
 RSA_KEY server_key;
 char *password;
 /* ---------------------- */
@@ -47,6 +48,7 @@ void init_sighandlers();
 void signal_stop(int signum);
 
 int load_server_key(char *keyfile, char *password, RSA_KEY *server_key);
+int check_root_dir(char *fname);
 int server_bind_err(struct sock server_socket);
 
 int handle_connections(int server_socket);
@@ -79,6 +81,11 @@ int chat_server(int argc, char **argv) {
 	/* TODO: loading of the database and initialization of the delivery queues */
 	if(load_server_key(opts.keyfile, password, &server_key) != 0) {
 		goto err1;
+	}
+
+	/* make sure we have a root directory */
+	if(check_root_dir(opts.root_dir) != 0) {
+		goto err2;
 	}
 
 	/* load up the database */
@@ -262,6 +269,29 @@ int load_server_key(char *keyfile, char *password, RSA_KEY *server_key) {
 		return 1;
 	}
 
+	return 0;
+}
+
+int check_root_dir(char *fname) {
+	struct stat st = {0};
+	if(stat(fname, &st) == -1) {
+		if(errno != ENOENT) {
+			fprintf(stderr, "failed to open root directory: %s\n", fname);
+			return -1;
+		}
+
+		/* directory doesn't exist, create it */
+		if(mkdir(fname, 0700) != 0) {
+			fprintf(stderr, "failed to create root directory: %s\n", fname);
+			return -1;
+		}
+	} else {
+		/* make sure its a directory */
+		if(!S_ISDIR(st.st_mode)) {
+			fprintf(stderr, "specified root is not a directory: %s\n", fname);
+			return -1;
+		}
+	}
 	return 0;
 }
 
