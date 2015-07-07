@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <wordexp.h>
 
 #include <sys/select.h>
 #include <sys/time.h>
@@ -15,6 +16,7 @@
 #include <ibcrypt/zfree.h>
 
 #include "client_handler.h"
+#include "user_db.h"
 #include "../crypto/keyfile.h"
 #include "../inet/connect.h"
 #include "../util/getpass.h"
@@ -79,6 +81,11 @@ int chat_server(int argc, char **argv) {
 		goto err1;
 	}
 
+	/* load up the database */
+	if(init_user_db(opts.root_dir) != 0) {
+		goto err2;
+	}
+
 	/* set up the server */
 	struct sock server_socket = server_bind(opts.port);
 	if(server_bind_err(server_socket) != 0) {
@@ -94,7 +101,6 @@ int chat_server(int argc, char **argv) {
 		fprintf(stderr, "handle connections error: %s\n", strerror(errno));
 		goto err3;
 	}
-
 
 	close(server_socket.fd);
 	if(password) zfree(password, strlen(password));
@@ -185,6 +191,28 @@ int process_opts(int argc, char **argv) {
 	}
 
 	opts.keyfile = argv[optind];
+
+	/* expand the root dir */
+	{ 
+		wordexp_t expanded;
+		if(wordexp(opts.root_dir, &expanded, WRDE_UNDEF) != 0) {
+			fprintf(stderr, "failed to expand root dir\n");
+			return 1;
+		}
+
+		if(expanded.we_wordc != 1) {
+			fprintf(stderr, "invalid root dir\n");
+			return 1;
+		}
+
+		opts.root_dir = strdup(expanded.we_wordv[0]);
+		if(opts.root_dir == NULL) {
+			fprintf(stderr, "strdup failed on root dir\n");
+			return 1;
+		}
+
+		wordfree(&expanded);
+	}
 
 	return 0;
 }

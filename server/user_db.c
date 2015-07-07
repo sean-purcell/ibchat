@@ -1,9 +1,11 @@
 /* contains a hash table containing user data */
 /* see dirstructure.txt */
 
+#include <dirent.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 
 #include <libibur/endian.h>
 
@@ -17,7 +19,9 @@
 
 #define MAX_READERS INT_MAX - 1
 
-static const char *USER_DIR = "users";
+static const char *USER_DIR_SUFFIX = "users/";
+
+static char *USER_DIR;
 
 struct user_db_ent {
 	struct user;
@@ -69,14 +73,51 @@ static int init_user_db_st() {
 	return 0;
 }
 
-int init_user_db() {
+static int load_user_files() {
+	DIR *userdir = NULL;
+
+	userdir = opendir(USER_DIR);
+	if(userdir == NULL) {
+		fprintf(stderr, "failed to open userdir: %s\n", USER_DIR);
+		return 1;
+	}
+
+	struct dirent *ent;
+	while((ent = readdir(userdir)) != NULL) {
+		printf("%s\n", ent->d_name);
+	}
+
+	hash_id(NULL);
+
+	return 0;
+}
+
+static int init_user_dir(char *root_dir) {
+	USER_DIR = malloc(strlen(root_dir) + strlen(USER_DIR_SUFFIX) + 1);
+	if(USER_DIR == NULL) {
+		return 1;
+	}
+
+	strcpy(USER_DIR, root_dir);
+	strcpy(USER_DIR + strlen(root_dir), USER_DIR_SUFFIX);
+
+	return 0;
+}
+
+int init_user_db(char *root_dir) {
 	/* set up the table */
 	if(init_user_db_st() != 0) {
 		return 1;
 	}
 
-	/* add all existing user files */
+	if(init_user_dir(root_dir) != 0) {
+		return 1;
+	}
 
+	/* add all existing user files */
+	if(load_user_files() != 0) {
+		return 1;
+	}
 
 	return 0;
 }

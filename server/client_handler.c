@@ -115,49 +115,49 @@ void ch_cleanup_end_handler(void *_arg) {
 }
 
 void *client_handler(void *_arg) {
-	struct client_handler handler;
-	struct ch_manager con_handler;
+	struct client_handler c_hndl;
+	struct ch_manager c_mgr;
 	pthread_t ch_thread;
 	struct keyset keys;
 
 	int ret;
 
-	if(init_client_handler(_arg, &handler) != 0) {
+	if(init_client_handler(_arg, &c_hndl) != 0) {
 		fprintf(stderr, "%d: failed to initialize client handler structure\n",
 			((struct handler_arg *)_arg)->fd);
 		goto err1;
 	}
 
 	/* initiate the connection handler thread */
-	init_handler(&con_handler.handler, handler.fd);
-	if(launch_handler(&ch_thread, &con_handler.handler) != 0) {
-		fprintf(stderr, "%d: failed to launch handler thread\n", handler.fd);
+	init_handler(&c_mgr.handler, c_hndl.fd);
+	if(launch_handler(&ch_thread, &c_mgr.handler) != 0) {
+		fprintf(stderr, "%d: failed to launch handler thread\n", c_hndl.fd);
 		goto err2;
 	}
-	pthread_cleanup_push(ch_cleanup_end_handler, &con_handler);
+	pthread_cleanup_push(ch_cleanup_end_handler, &c_mgr);
 
 	/* complete the handshake */
-	if((ret = client_handler_handshake(&con_handler.handler, &keys)) != 0) {
-		printf("%d: failed to complete handshake: %d\n", handler.fd, ret);
+	if((ret = client_handler_handshake(&c_mgr.handler, &keys)) != 0) {
+		printf("%d: failed to complete handshake: %d\n", c_hndl.fd, ret);
 		goto err3;
 	}
-	printf("%d: successfully completed handshake\n", handler.fd);
+	printf("%d: successfully completed handshake\n", c_hndl.fd);
 
 	/* now we can start communicating with this user */
-	auth_user(&handler, &con_handler.handler, &keys);
+	auth_user(&c_hndl, &c_mgr.handler, &keys);
 
 	/* thats it for now, sleep for a bit and then exit */
 	sleep(5);
 
-	printf("%d: exiting\n", handler.fd);
+	printf("%d: exiting\n", c_hndl.fd);
 
 
 	memset(&keys, 0, sizeof(struct keyset));
 err3:
 	pthread_cleanup_pop(1);
 err2:
-	destroy_handler(&con_handler.handler);
-	destroy_client_handler(&handler);
+	destroy_handler(&c_mgr.handler);
+	destroy_client_handler(&c_hndl);
 err1:
 	return NULL;
 }
