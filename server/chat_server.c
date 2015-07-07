@@ -28,6 +28,8 @@ RSA_KEY server_key;
 char *password;
 /* ---------------------- */
 
+RSA_PUBLIC_KEY server_pub_key;
+
 void usage(char *argv0) {
 	fprintf(stderr, "usage: %s [-p port]"
 		"[-d server_root_directory] [--no-pw] <key file>\n", argv0);
@@ -266,6 +268,11 @@ int load_server_key(char *keyfile, char *password, RSA_KEY *server_key) {
 
 		fprintf(stderr, "%s\n", estr);
 
+		return 1;
+	}
+
+	if(rsa_pub_key(server_key, &server_pub_key) != 0) {
+		fprintf(stderr, "failed to create public key\n");
 		return 1;
 	}
 

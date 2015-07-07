@@ -14,6 +14,8 @@
 
 #include <ibcrypt/sha256.h>
 
+#include "chat_server.h"
+
 #define TOP_LOAD (0.75)
 #define BOT_LOAD (0.5 / 2)
 
@@ -22,9 +24,11 @@
 
 #define MAX_READERS INT_MAX - 1
 
-static const char *USER_DIR_SUFFIX = "users/";
+static const char *USER_DIR_SUFFIX = "/users/";
 
 static char *USER_DIR;
+
+static const char USER_FILE_MAGIC[8] = "userdb\0\0";
 
 struct user {
 
@@ -103,23 +107,104 @@ static int check_user_dir() {
 	return 0;
 }
 
+static int parse_user_file(char *name) {
+#define ERR() do { fprintf(stderr, "invalid user file: %s\n", name);\
+	goto err; } while(0);
+#define READ(f, b, s)                                            \
+        if(fread(b, s, 1, f) != 1) {                             \
+		ERR();                                           \
+        }
+
+	FILE *uf = fopen(name, "rb");
+	if(uf == NULL) {
+		fprintf(stderr, "failed to open user file: %s\n", name);
+		return 1;
+	}
+
+	uint8_t prefix[8 + 0x20 + 0x20 + 8];
+	uint8_t *magic = prefix;
+	uint8_t *uid = magic + 8;
+	uint8_t *undelivered = uid + 0x20;
+	uint8_t *sizebuf = undelivered + 0x20;
+	RSA_PUBLIC_KEY pkey;
+
+	uint64_t pkey_size;
+
+	memset(&pkey, 0, sizeof(pkey));
+
+	READ(uf, magic, 8);
+	if(memcmp(magic, USER_FILE_MAGIC, 8) != 0) {
+		ERR();
+	}
+
+	READ(uf, uid, 0x20);
+	READ(uf, undelivered, 0x20);
+
+	READ(uf, sizebuf, 8);
+
+	int valid = 0;
+	rsa_pss_verify(&server_pub_key, 
+
+	int ret = 0;
+	goto exit;
+err:
+	ret = 1;
+exit:
+	fclose(uf);
+	memset(prefix, sizeof(prefix);
+	rsa_free_pubkey(&pkey);
+
+	return ret;
+}
+
 static int load_user_files() {
 	if(check_user_dir() != 0) {
 		return 1;
 	}
 
-
-	DIR *userdir = NULL;
-
-	userdir = opendir(USER_DIR);
+	DIR *userdir = opendir(USER_DIR);
 	if(userdir == NULL) {
 		fprintf(stderr, "failed to open userdir: %s\n", USER_DIR);
 		return 1;
 	}
 
+	size_t upathlen = strlen(USER_PATH);
+	char *path = malloc(upathlen + 64 + 1);
+	path[upathlen + 64] = '\0';
+	if(path == NULL) {
+		fprintf(stderr, "failed to allocate memory\n");
+		return 1;
+	}
+
 	struct dirent *ent;
+	char *name;
 	while((ent = readdir(userdir)) != NULL) {
-		printf("%s\n", ent->d_name);
+		name = ent->d_name;
+		if(name[0] == '.') {
+			continue;
+		}
+		if(strlen(name) != 64) {
+			/* names are hex versions of sha256 hashes
+			 * so they are 64 characters long */
+			fprintf(stderr, "unrecognised file in user dir: %s\n", name);
+			continue;
+		}
+		int valid = 1;
+		for(int i = 0; i < 64; i++) {
+			valid &= ((name[i] >= '0' && name[i] <= '9') ||
+			          (name[i] >= 'a' && name[i] <= 'f'));
+			path[upathlen + i] = name[i];
+		}
+		if(!valid) {
+			fprintf(stderr, "unrecognised file in user dir: %s\n", name);
+			continue;
+		}
+		printf("loading user file %s\n", name);
+
+		if(parse_user_file(path) != 0) {
+			fprintf(stderr, "failed to parse user file\n");
+			continue;
+		}
 	}
 
 	hash_id(NULL);

@@ -3,10 +3,12 @@
 
 #include <ibcrypt/rsa.h>
 
-/* central operating info */
+/* private info */
 extern RSA_KEY server_key;
 extern char *password;
 /* ---------------------- */
+
+extern RSA_PUBLIC_KEY server_pub_key;
 
 #endif
 
