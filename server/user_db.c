@@ -12,7 +12,11 @@
 
 #include <libibur/endian.h>
 
+#include <ibcrypt/rsa.h>
+#include <ibcrypt/rsa_util.h>
 #include <ibcrypt/sha256.h>
+
+#include "user_db.h"
 
 #include "chat_server.h"
 
@@ -29,10 +33,6 @@ static const char *USER_DIR_SUFFIX = "/users/";
 static char *USER_DIR;
 
 static const char USER_FILE_MAGIC[8] = "userdb\0\0";
-
-struct user {
-
-};
 
 struct user_db_ent {
 	struct user u;
@@ -62,6 +62,10 @@ static uint64_t hash_id(uint8_t *id) {
 		decbe64(&id[24]);
 }
 
+static uint64_t hash(struct user *u) {
+	return hash_id(u->uid);
+}
+
 static int init_user_db_st() {
 	size_t size = MIN_SIZE * sizeof(struct user_db_ent *);
 	db.buckets = malloc(size);
@@ -82,6 +86,65 @@ static int init_user_db_st() {
 	}
 
 	return 0;
+}
+
+static int resize() {
+	uint64_t nsize = db.size;
+	if(db.size < MAX_SIZE &&
+		(uint64_t) (db.elements / TOP_LOAD) > db.size) {
+		db.size *= 2;
+	}
+	if(db.size > MIN_SIZE &&
+		(uint64_t) (db.elements / BOT_LOAD) < db.size) {
+		db.size /= 2;
+	}
+
+	if(nsize == db.size) {
+		return 0;
+	}
+
+	size_t bufsize = nsize * sizeof(struct user_db_ent *);
+	struct user_db_ent **nbuckets = malloc(bufsize);
+	if(nbuckets == NULL) {
+		return 1;
+	}
+	memset(nbuckets, 0, bufsize);
+
+	for(uint64_t i = 0; i < db.size; i++) {
+		struct user_db_ent *cur = db.buckets[i];
+		struct user_db_ent *next;
+		while(cur != NULL) {
+			next = cur->next;
+			uint64_t nidx = hash(&cur->u) % nsize;
+			cur->next = nbuckets[nidx];
+			nbuckets[nidx] = cur;
+			cur = next;
+		}
+	}
+
+	free(db.buckets);
+	db.buckets = nbuckets;
+	db.size = nsize;
+
+	return 0;
+}
+
+static int user_db_add(struct user u) {
+	uint64_t idx = hash(&u) % db.size;
+
+	struct user_db_ent *ent = malloc(sizeof(struct user_db_ent));
+	if(ent == NULL) {
+		return 1;
+	}
+
+	ent->u = u;
+	struct user_db_ent *bucket = db.buckets[idx];
+	ent->next = bucket;
+	db.buckets[idx] = ent;
+
+	db.elements++;
+
+	return resize();
 }
 
 static int check_user_dir() {
@@ -107,7 +170,7 @@ static int check_user_dir() {
 	return 0;
 }
 
-static int parse_user_file(char *name) {
+static int parse_user_file(char *name, struct user *user) {
 #define ERR() do { fprintf(stderr, "invalid user file: %s\n", name);\
 	goto err; } while(0);
 #define READ(f, b, s)                                            \
@@ -128,6 +191,9 @@ static int parse_user_file(char *name) {
 	uint8_t *sizebuf = undelivered + 0x20;
 	RSA_PUBLIC_KEY pkey;
 
+	uint8_t *buf = NULL;
+	uint8_t *sigbuf = NULL;
+
 	uint64_t pkey_size;
 
 	memset(&pkey, 0, sizeof(pkey));
@@ -142,8 +208,59 @@ static int parse_user_file(char *name) {
 
 	READ(uf, sizebuf, 8);
 
+	uint64_t siglen = (server_pub_key.bits + 7) / 8;
+	sigbuf = malloc(siglen);
+	if(sigbuf == NULL) {
+		ERR();
+	}
+
+	READ(uf, sigbuf, siglen);
+
+	/* the key length is signed so that we know that the length
+	 * hasn't been tampered with */
 	int valid = 0;
-	rsa_pss_verify(&server_pub_key, 
+	if(rsa_pss_verify(&server_pub_key, sigbuf, siglen, prefix, 0x50, &valid) != 0) {
+		ERR();
+	}
+	if(!valid) {
+		ERR();
+	}
+
+	pkey_size = decbe64(sizebuf);
+
+	buf = malloc(0x50 + siglen + pkey_size);
+	if(buf == NULL) {
+		ERR();
+	}
+
+	uint8_t *pkey_buf = buf + 0x50 + siglen;
+
+	/* read in the public key */
+	READ(uf, buf, pkey_size);
+
+	/* copy the other data into the buffer */
+	memcpy(buf, prefix, 0x50);
+	memcpy(buf + 0x50, sigbuf, siglen);
+
+	/* read in the signature, same key so same size as previous */
+	READ(uf, sigbuf, siglen);
+
+	/* verify again before unpacking public key */
+	if(rsa_pss_verify(&server_pub_key, sigbuf, siglen, buf, 0x50 + siglen + pkey_size, &valid) != 0) {
+		ERR();
+	}
+	if(!valid) {
+		ERR();
+	}
+
+	if(rsa_wire2pubkey(pkey_buf, pkey_size, &pkey) != 0) {
+		ERR();
+	}
+
+	/* public keys can be passed by value */
+	user->pkey = pkey;
+	memcpy(user->uid, uid, 0x20);
+	memcpy(user->undel, undelivered, 0x20);
 
 	int ret = 0;
 	goto exit;
@@ -151,8 +268,10 @@ err:
 	ret = 1;
 exit:
 	fclose(uf);
-	memset(prefix, sizeof(prefix);
-	rsa_free_pubkey(&pkey);
+	if(ret) rsa_free_pubkey(&pkey); /* if we succeeded we don't want to destroy the public key */
+	if(sigbuf) free(sigbuf);
+	if(buf) free(buf);
+	/* none of this is sensitive so we don't need to zero it */
 
 	return ret;
 }
@@ -168,7 +287,7 @@ static int load_user_files() {
 		return 1;
 	}
 
-	size_t upathlen = strlen(USER_PATH);
+	size_t upathlen = strlen(USER_DIR);
 	char *path = malloc(upathlen + 64 + 1);
 	path[upathlen + 64] = '\0';
 	if(path == NULL) {
@@ -201,13 +320,18 @@ static int load_user_files() {
 		}
 		printf("loading user file %s\n", name);
 
-		if(parse_user_file(path) != 0) {
-			fprintf(stderr, "failed to parse user file\n");
+		struct user u;
+
+		if(parse_user_file(path, &u) != 0) {
+			fprintf(stderr, "failed to parse user file: %s\n", name);
 			continue;
 		}
-	}
 
-	hash_id(NULL);
+		/* add it to the struct */
+		if(user_db_add(u) != 0) {
+			fprintf(stderr, "failed to add user to struct: %s\n", name);
+		}
+	}
 
 	return 0;
 }
