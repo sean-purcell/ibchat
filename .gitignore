@@ -6,4 +6,5 @@ a.out
 *.pub
 ibchat*
 *_test
+bin/
 
