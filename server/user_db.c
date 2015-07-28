@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 
 #include <libibur/endian.h>
+#include <libibur/util.h>
 
 #include <ibcrypt/rsa.h>
 #include <ibcrypt/rsa_util.h>
@@ -129,7 +130,7 @@ static int resize() {
 	return 0;
 }
 
-static int user_db_add(struct user u) {
+static int user_db_add_no_write(struct user u) {
 	uint64_t idx = hash(&u) % db.size;
 
 	struct user_db_ent *ent = malloc(sizeof(struct user_db_ent));
@@ -173,9 +174,9 @@ static int check_user_dir() {
 static int parse_user_file(char *name, struct user *user) {
 #define ERR() do { fprintf(stderr, "invalid user file: %s\n", name);\
 	goto err; } while(0);
-#define READ(f, b, s)                                            \
-        if(fread(b, s, 1, f) != 1) {                             \
-		ERR();                                           \
+#define READ(f, b, s)                                                          \
+        if(fread(b, s, 1, f) != 1) {                                           \
+                ERR();                                                         \
         }
 
 	FILE *uf = fopen(name, "rb");
@@ -191,6 +192,9 @@ static int parse_user_file(char *name, struct user *user) {
 	uint8_t *sizebuf = undelivered + 0x20;
 	RSA_PUBLIC_KEY pkey;
 
+	/* the value for the uid based on the name */
+	uint8_t expected_uid[0x20];
+
 	uint8_t *buf = NULL;
 	uint8_t *sigbuf = NULL;
 
@@ -204,6 +208,17 @@ static int parse_user_file(char *name, struct user *user) {
 	}
 
 	READ(uf, uid, 0x20);
+
+	/* check the uid against the expected one */
+	from_hex(name, expected_uid);
+
+	/* it is conceivable that someone has read permissions for the
+	 * directory but not for the file, however this is likely being
+	 * paranoid */
+	if(memcmp_ct(uid, expected_uid, 0x20) != 0) {
+		ERR();
+	}
+
 	READ(uf, undelivered, 0x20);
 
 	READ(uf, sizebuf, 8);
@@ -274,12 +289,106 @@ exit:
 	/* none of this is sensitive so we don't need to zero it */
 
 	return ret;
+#undef ERR
+#undef READ
+}
+
+static int write_user_file(struct user *u) {
+#define ERR() do { fprintf(stderr, "failed to write user file: %s\n", name);\
+	goto err; } while(0);
+#define WRITE(f, b, s)                                                        \
+        if(fwrite(b, s, 1, f) != 1) {                                         \
+                ERR();                                                        \
+        }
+
+	char name[65];
+	name[64] = '\0';
+	to_hex(u->uid, 0x20, name);
+
+	size_t upathlen = strlen(USER_DIR);
+	char *path = malloc(upathlen + 64 + 1);
+	if(path == NULL) {
+		fprintf(stderr, "failed to allocate memory for user file: %s\n", name);
+		return 1;
+	}
+
+	path[upathlen + 64] = '\0';
+
+	strcpy(path, USER_DIR);
+	to_hex(u->uid, 0x20, path + upathlen);
+
+	FILE *uf = fopen(path, "wb");
+	if(uf == NULL) {
+		fprintf(stderr, "failed to open user file: %s\n", name);
+		return 1;
+	}
+
+	size_t sigsize = (server_key.bits + 7) / 8;
+
+	size_t bufsize = 0;
+	/* prefix */
+	bufsize += 8 + 0x20 + 0x20 + 8;
+	/* signature 1 */
+	bufsize += sigsize;
+	/* public key */
+	bufsize += rsa_pubkey_bufsize(u->pkey.bits);
+	/* signature 2 */
+	bufsize += sigsize;
+
+	uint8_t *buf = NULL;
+
+	buf = malloc(bufsize);
+	if(buf == NULL) {
+		fprintf(stderr, "failed to allocate memory for user file: %s\n", name);
+		return 1;
+	}
+
+	uint8_t *magic = buf;
+	uint8_t *uid = magic + 8;
+	uint8_t *undelivered = uid + 0x20;
+	uint8_t *sizebuf = undelivered + 0x20;
+	uint8_t *sig1 = sizebuf + 8;
+	uint8_t *pkey = sig1 + sigsize;
+	uint8_t *sig2 = pkey + rsa_pubkey_bufsize(u->pkey.bits);
+
+	memcpy(magic, USER_FILE_MAGIC, 8);
+	memcpy(uid, u->uid, 0x20);
+	memcpy(undelivered, u->undel, 0x20);
+	encbe64(rsa_pubkey_bufsize(u->pkey.bits), sizebuf);
+
+	if(rsa_pss_sign(&server_key, buf, sig1 - buf, sig1, sigsize) != 0) {
+		ERR();
+	}
+
+	rsa_pubkey2wire(&u->pkey, pkey, rsa_pubkey_bufsize(u->pkey.bits));
+
+	if(rsa_pss_sign(&server_key, buf, sig2 - buf, sig2, sigsize) != 0) {
+		ERR();
+	}
+
+	WRITE(uf, buf, bufsize);
+
+	int ret = 0;
+	goto exit;
+err:
+	ret = 1;
+exit:
+	fclose(uf);
+	if(buf) free(buf);
+	if(path) free(path);
+	/* none of this is sensitive so we don't need to zero it */
+
+	return ret;
+#undef ERR
+#undef WRITE
 }
 
 static int load_user_files() {
 	if(check_user_dir() != 0) {
 		return 1;
 	}
+
+	printf("reading user files from user dir %s\n", USER_DIR);
 
 	DIR *userdir = opendir(USER_DIR);
 	if(userdir == NULL) {
@@ -289,11 +398,11 @@ static int load_user_files() {
 
 	size_t upathlen = strlen(USER_DIR);
 	char *path = malloc(upathlen + 64 + 1);
-	path[upathlen + 64] = '\0';
 	if(path == NULL) {
 		fprintf(stderr, "failed to allocate memory\n");
 		return 1;
 	}
+	path[upathlen + 64] = '\0';
 
 	struct dirent *ent;
 	char *name;
@@ -328,7 +437,7 @@ static int load_user_files() {
 		}
 
 		/* add it to the struct */
-		if(user_db_add(u) != 0) {
+		if(user_db_add_no_write(u) != 0) {
 			fprintf(stderr, "failed to add user to struct: %s\n", name);
 		}
 	}
@@ -348,7 +457,7 @@ static int init_user_dir(char *root_dir) {
 	return 0;
 }
 
-int init_user_db(char *root_dir) {
+int user_db_init(char *root_dir) {
 	/* set up the table */
 	if(init_user_db_st() != 0) {
 		return 1;
@@ -364,5 +473,39 @@ int init_user_db(char *root_dir) {
 	}
 
 	return 0;
+}
+
+struct user *user_db_get(uint8_t *uid) {
+	uint64_t idx = hash_id(uid) % db.size;
+
+	struct user_db_ent *ent = db.buckets[idx];
+	while(ent) {
+		if(memcmp_ct(ent->u.uid, uid, 0x20) == 0) {
+			return &ent->u;
+		}
+
+		ent = ent->next;
+	}
+
+	return NULL;
+}
+
+/* registers a new user */
+int user_db_add(struct user u) {
+	/* check if the user exists first */
+	if(user_db_get(u.uid) != NULL) {
+		char name[64];
+		to_hex(u.uid, 0x20, name);
+		fprintf(stderr, "attempted to add already added user %s\n", name);
+		return -1;
+	}
+
+	/* create a user file */
+	if(write_user_file(&u) != 0) {
+		fprintf(stderr, "failed to write user file\n");
+		return 1;
+	}
+
+	return user_db_add_no_write(u);
 }
 

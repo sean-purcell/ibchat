@@ -91,7 +91,7 @@ int chat_server(int argc, char **argv) {
 	}
 
 	/* load up the database */
-	if(init_user_db(opts.root_dir) != 0) {
+	if(user_db_init(opts.root_dir) != 0) {
 		goto err2;
 	}
 

@@ -11,7 +11,7 @@ struct user {
 	uint8_t undel[0x20];
 };
 
-int init_user_db(char *root_dir);
+int user_db_init(char *root_dir);
 
 #endif
 
