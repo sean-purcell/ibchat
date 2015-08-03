@@ -31,7 +31,7 @@ char *password;
 RSA_PUBLIC_KEY server_pub_key;
 
 void usage(char *argv0) {
-	fprintf(stderr, "usage: %s [-p port]"
+	fprintf(stderr, "usage: %s [-p port] "
 		"[-d server_root_directory] [--no-pw] <key file>\n", argv0);
 }
 
