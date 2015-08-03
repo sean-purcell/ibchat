@@ -18,6 +18,7 @@
 #include "../crypto/handshake.h"
 #include "../inet/message.h"
 #include "../util/defaults.h"
+#include "../util/lock.h"
 
 struct handler_arg {
 	pthread_t thread;
@@ -171,20 +172,13 @@ err1:
 #define MAX_SIZE ((uint64_t)1 << 20)
 #define MIN_SIZE ((uint64_t) 16)
 
-#define MAX_READERS INT_MAX - 1
-
 struct handler_table {
 	struct client_handler **buckets;
 	uint64_t size; /* doubles as the modulus */
 
 	uint64_t elements;
 
-	/* indicates number of readers */
-	/* to read, wait until it becomes non-negative, and then increment */
-	/* to write, wait until it becomes 0, and then decrement */
-	pthread_mutex_t use_state_mutex;
-	pthread_cond_t use_state_cond;
-	int use_state;
+	struct lock l;
 } ht;
 
 static uint64_t hash_id(uint8_t *id) {
@@ -192,42 +186,6 @@ static uint64_t hash_id(uint8_t *id) {
 		decbe64(&id[ 8]) ^
 		decbe64(&id[16]) ^
 		decbe64(&id[24]);
-}
-
-static void ht_acquire_readlock() {
-	pthread_mutex_lock(&ht.use_state_mutex);
-	while(ht.use_state < 0 || ht.use_state == MAX_READERS) {
-		pthread_cond_wait(&ht.use_state_cond,
-			&ht.use_state_mutex);
-	}
-	ht.use_state++;
-	pthread_mutex_unlock(&ht.use_state_mutex);
-}
-
-static void ht_release_readlock() {
-	pthread_mutex_lock(&ht.use_state_mutex);
-	assert(ht.use_state > 0);
-	ht.use_state--;
-	pthread_cond_broadcast(&ht.use_state_cond);
-	pthread_mutex_unlock(&ht.use_state_mutex);
-}
-
-static void ht_acquire_writelock() {
-	pthread_mutex_lock(&ht.use_state_mutex);
-	while(ht.use_state != 0) {
-		pthread_cond_wait(&ht.use_state_cond,
-			&ht.use_state_mutex);
-	}
-	ht.use_state--;
-	pthread_mutex_unlock(&ht.use_state_mutex);
-}
-
-static void ht_release_writelock() {
-	pthread_mutex_lock(&ht.use_state_mutex);
-	assert(ht.use_state == -1);
-	ht.use_state++;
-	pthread_cond_broadcast(&ht.use_state_cond);
-	pthread_mutex_unlock(&ht.use_state_mutex);	
 }
 
 static int resize_handler_table(uint64_t nsize) {
@@ -276,11 +234,7 @@ int init_handler_table() {
 	ht.size = MIN_SIZE;
 	ht.elements = 0;
 
-	ht.use_state = 0;
-	if(pthread_cond_init(&ht.use_state_cond, NULL) != 0) {
-		return 1;
-	}
-	if(pthread_mutex_init(&ht.use_state_mutex, NULL) != 0) {
+	if(init_lock(&ht.l) != 0) {
 		return 1;
 	}
 
@@ -289,12 +243,11 @@ int init_handler_table() {
 
 void destroy_handler_table() {
 	free(ht.buckets);
-	pthread_cond_destroy(&ht.use_state_cond);
-	pthread_mutex_destroy(&ht.use_state_mutex);
+	destroy_lock(&ht.l);
 }
 
 struct client_handler *get_handler(uint8_t* id) {
-	ht_acquire_readlock();
+	acquire_readlock(&ht.l);
 
 	uint64_t index = hash_id(id) % ht.size;
 	struct client_handler *cur = ht.buckets[index];
@@ -308,12 +261,12 @@ struct client_handler *get_handler(uint8_t* id) {
 	}
 
 exit:
-	ht_release_readlock();
+	release_readlock(&ht.l);
 	return cur;
 }
 
 int add_handler(struct client_handler *handler) {
-	ht_acquire_writelock();
+	acquire_writelock(&ht.l);
 
 	uint64_t index = hash_id(handler->id) % ht.size;
 	struct client_handler **loc = &ht.buckets[index];
@@ -341,12 +294,12 @@ int add_handler(struct client_handler *handler) {
 	}
 
 exit:
-	ht_release_writelock();
+	release_writelock(&ht.l);
 	return ret;
 }
 
 int rem_handler(uint8_t* id) {
-	ht_acquire_writelock();
+	acquire_writelock(&ht.l);
 
 	uint64_t index = hash_id(id) % ht.size;
 	struct client_handler **loc = &ht.buckets[index];
@@ -377,7 +330,7 @@ int rem_handler(uint8_t* id) {
 	}
 
 exit:
-	ht_release_writelock();
+	release_writelock(&ht.l);
 	return ret;
 }
 

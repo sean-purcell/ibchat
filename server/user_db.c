@@ -21,13 +21,13 @@
 
 #include "chat_server.h"
 
+#include "../util/lock.h"
+
 #define TOP_LOAD (0.75)
 #define BOT_LOAD (0.5 / 2)
 
 #define MAX_SIZE ((uint64_t)1 << 20)
 #define MIN_SIZE ((uint64_t) 16)
-
-#define MAX_READERS INT_MAX - 1
 
 static const char *USER_DIR_SUFFIX = "/users/";
 
@@ -46,11 +46,7 @@ struct user_db_st {
 
 	uint64_t elements;
 
-	/* the use state indicates whether it can be written to/read from */
-	/* see server/client_handler.c for a similar example */
-	pthread_mutex_t use_state_mutex;
-	pthread_cond_t use_state_cond;
-	int use_state;
+	struct lock l;
 } db;
 
 static uint64_t hash_id(uint8_t *id) {
@@ -78,11 +74,7 @@ static int init_user_db_st() {
 	db.size = MIN_SIZE;
 	db.elements = 0;
 
-	db.use_state = 0;
-	if(pthread_cond_init(&db.use_state_cond, NULL) != 0) {
-		return 1;
-	}
-	if(pthread_mutex_init(&db.use_state_mutex, NULL) != 0) {
+	if(init_lock(&db.l) != 0) {
 		return 1;
 	}
 
@@ -475,37 +467,79 @@ int user_db_init(char *root_dir) {
 	return 0;
 }
 
-struct user *user_db_get(uint8_t *uid) {
+void user_db_destroy() {
+	for(uint64_t i = 0; i < db.size; i++) {
+		struct user_db_ent *cur = db.buckets[i];
+		struct user_db_ent *next;
+		while(cur != NULL) {
+			next = cur->next;
+			free(cur);
+			cur = next;
+		}
+	}
+
+	db.size = 0;
+	db.elements = 0;
+
+	destroy_lock(&db.l);
+}
+
+/* allows it to be called from within user_db_add */
+static struct user *user_db_get_nolock(uint8_t *uid) {
 	uint64_t idx = hash_id(uid) % db.size;
 
 	struct user_db_ent *ent = db.buckets[idx];
+	struct user *ret = NULL;
 	while(ent) {
 		if(memcmp_ct(ent->u.uid, uid, 0x20) == 0) {
-			return &ent->u;
+			ret = &ent->u;
+			break;
 		}
 
 		ent = ent->next;
 	}
 
-	return NULL;
+	return ret;
+}
+
+struct user *user_db_get(uint8_t *uid) {
+	acquire_readlock(&db.l);
+	struct user *ret = user_db_get_nolock(uid);
+	release_readlock(&db.l);
+	return ret;
 }
 
 /* registers a new user */
 int user_db_add(struct user u) {
+	acquire_writelock(&db.l);
+
+	int ret = 0;
+
 	/* check if the user exists first */
-	if(user_db_get(u.uid) != NULL) {
+	if(user_db_get_nolock(u.uid) != NULL) {
 		char name[64];
 		to_hex(u.uid, 0x20, name);
 		fprintf(stderr, "attempted to add already added user %s\n", name);
-		return -1;
+		ret = -1;
+		goto exit;
 	}
 
 	/* create a user file */
 	if(write_user_file(&u) != 0) {
 		fprintf(stderr, "failed to write user file\n");
-		return 1;
+		ret = 1;
+		goto exit;
 	}
 
-	return user_db_add_no_write(u);
+	/* add it to the table */
+	if(user_db_add_no_write(u) != 0) {
+		fprintf(stderr, "failed to add user struct to database\n");
+		ret = 1;
+		goto exit;
+	}
+
+exit:
+	release_writelock(&db.l);
+	return ret;
 }
 
