@@ -5,6 +5,7 @@
 #include <ibcrypt/rsa.h>
 #include <ibcrypt/rsa_util.h>
 #include <ibcrypt/rand.h>
+#include <ibcrypt/bignum.h>
 
 #include <libibur/util.h>
 #include <libibur/endian.h>
@@ -14,19 +15,73 @@
 #include "../inet/message.h"
 
 #include "client_handler.h"
+#include "user_db.h"
 
-int check_user(uint8_t *uid, RSA_PUBLIC_KEY *pkey) {
+static int check_user(uint8_t *uid, RSA_PUBLIC_KEY *pkey) {
+	struct user *u = user_db_get(uid);
+	if(u == NULL) {
+		return 1;
+	}
+
+	/* compare the public keys */
+	{
+		uint64_t ret = 0;
+		ret |= (pkey->bits - u->pkey.bits);
+		ret |= (pkey->e - u->pkey.e);
+
+		ret |= bno_cmp(&pkey->n, &u->pkey.n);
+
+		if(ret != 0) {
+			return 3;
+		}
+	}
+
+	/* now check if the user is already logged in */
+	if(get_handler(uid) != NULL) {
+		return 2;
+	}
+
 	return 0;
 }
 
-int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, struct keyset *keys) {
+static int prompt_user_register(struct con_handle *con_hndl, struct keyset *keys) {
+	struct message *resp = recv_message(con_hndl, 0);
+
+	if(resp == NULL) {
+		return -1;
+	}
+
+	if(resp->length != 8 || memcmp(resp->message, "register", 8) != 0) {
+		return 1;
+	}
+
+	return 0;
+}
+
+static int register_user(uint8_t *uid, RSA_PUBLIC_KEY *pkey, struct con_handle *con_hndl, struct keyset *keys) {
+	int ret = prompt_user_register(con_hdnl, keys);
+	if(ret != 0) {
+		return ret;
+	}
+
+	/* add them to the user database */
+	struct user u;
+	if(init_user(uid, pkey, &u) != 0) {
+		return -1;
+	}
+
+	if(user_db_add(u) != 0) {
+		return -1;
+	}
+}
+
+int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, struct keyset *keys, uint8_t *uid) {
 #define ERR(x) fprintf(stderr, "%d: %s\n", cli_hndl->fd, x)
 
 	uint8_t challenge[0x20];
 
 	struct message *cli_response;
 
-	uint8_t uid[0x20];
 	RSA_PUBLIC_KEY pb_key;
 
 	/* generate 256 bit challenge numbers and send them */
@@ -103,19 +158,33 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 	/* now we have a uid and public key, identify this user */
 	int ret = check_user(uid, &pb_key);
 
-	switch(ret) {
-	case 0:
-		break;
-	case 1:
-		break;
-	case 2:
-		break;
-	case 3:
-		break;
+	char msg[8] = "cliauth";
+	msg[7] = ret;
+
+	if(send_message(con_hndl, keys, msg, 8) != 0) {
+		goto err3;
+	}
+
+	if(ret == 2 || ret == 3) {
+		if(ret == 2) {
+			printf("%d: user already logged in\n", cli_hndl->fd);
+		} else {
+			printf("%d: user exists with different public key\n", cli_hndl->fd);
+		}
+		goto err3;
+	}
+
+	if(ret == 1) {
+		ret = user_register(uid, &pb_key, cli_hndl);
+		if(ret != 0) {
+			if(ret == -1) {
+				fprintf(stderr, "%d: failed to register user\n", cli_hndl->fd)/
+			}
+			goto err;
+		}
 	}
 
 	memset(challenge, 0, sizeof(challenge));
-	memset(uid, 0, sizeof(uid));
 
 	rsa_free_pubkey(&pb_key);
 	free_message(cli_response);

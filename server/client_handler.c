@@ -145,7 +145,9 @@ void *client_handler(void *_arg) {
 	printf("%d: successfully completed handshake\n", c_hndl.fd);
 
 	/* now we can start communicating with this user */
-	auth_user(&c_hndl, &c_mgr.handler, &keys);
+	if(auth_user(&c_hndl, &c_mgr.handler, &keys, &c_hndl) != 0) {
+		goto err3;
+	}
 
 	/* thats it for now, sleep for a bit and then exit */
 	sleep(5);
@@ -182,10 +184,13 @@ struct handler_table {
 } ht;
 
 static uint64_t hash_id(uint8_t *id) {
-	return  decbe64(&id[ 0]) ^
-		decbe64(&id[ 8]) ^
-		decbe64(&id[16]) ^
-		decbe64(&id[24]);
+	uint8_t shasum[32];
+	sha256(id, 32, shasum);
+
+	return  decbe64(&shasum[ 0]) ^
+	        decbe64(&shasum[ 8]) ^
+	        decbe64(&shasum[16]) ^
+		decbe64(&shasum[24]);
 }
 
 static int resize_handler_table(uint64_t nsize) {

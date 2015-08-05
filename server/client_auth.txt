@@ -23,6 +23,8 @@ server->client:
 	user already logged in
 3:
 	user exists with different public key
+4:
+	server-side error occurred
 
 if the signature is invalid, end the connection with no response
 

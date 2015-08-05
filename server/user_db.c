@@ -16,6 +16,7 @@
 #include <ibcrypt/rsa.h>
 #include <ibcrypt/rsa_util.h>
 #include <ibcrypt/sha256.h>
+#include <ibcrypt/rand.h>
 
 #include "user_db.h"
 
@@ -53,10 +54,10 @@ static uint64_t hash_id(uint8_t *id) {
 	uint8_t shasum[32];
 	sha256(id, 32, shasum);
 
-	return  decbe64(&id[ 0]) ^
-	        decbe64(&id[ 8]) ^
-	        decbe64(&id[16]) ^
-		decbe64(&id[24]);
+	return  decbe64(&shasum[ 0]) ^
+	        decbe64(&shasum[ 8]) ^
+	        decbe64(&shasum[16]) ^
+		decbe64(&shasum[24]);
 }
 
 static uint64_t hash(struct user *u) {
@@ -541,5 +542,53 @@ int user_db_add(struct user u) {
 exit:
 	release_writelock(&db.l);
 	return ret;
+}
+
+static int gen_undel_file(uint8_t *id) {
+	if(cs_rand(id, 0x20) != 0) {
+		fprintf(stderr, "failed to generate random numbers\n");
+		return 1;
+	}
+
+	/* check if the file already exists, in which case our rng is broken */
+	size_t pathlen = sizeof(USER_DIR) + 64 + 1;
+	char *path = malloc(pathlen);
+	if(path == NULL) {
+		fprintf(stderr, "failed to allocate memory\n");
+		return 1;
+	}
+
+	strcpy(path, USER_DIR);
+	to_hex(id, 0x20, &path[strlen(USER_DIR)]);
+
+	struct stat st = {0};
+	if(stat(path, &st) == -1) {
+		if(errno != ENOENT) {
+			fprintf(stderr, "failed to read from undelivered dir: %s\n", path);
+			return 1;
+		}
+	} else {
+		fprintf(stderr, "RNG unsafe, repeat undel file generated: %s\n", path);
+		return 1;
+	}
+
+	return 0;
+}
+
+int user_init(uint8_t *uid, RSA_PUBLIC_KEY pkey, struct user *u) {
+	memcpy(u->uid, uid, 0x20);
+
+	if(gen_undel_file(u->undel) != 0) {
+		return 1;
+	}
+
+	u->pkey.e = pkey.e;
+	u->pkey.bits = pkey.bits;
+
+	if(bni_cpy(&u->pkey, &pkey) != 0) {
+		return 1;
+	}
+
+	return 0;
 }
 
