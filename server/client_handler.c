@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include <ibcrypt/rand.h>
+#include <ibcrypt/sha256.h>
 
 #include <libibur/endian.h>
 
@@ -145,7 +146,7 @@ void *client_handler(void *_arg) {
 	printf("%d: successfully completed handshake\n", c_hndl.fd);
 
 	/* now we can start communicating with this user */
-	if(auth_user(&c_hndl, &c_mgr.handler, &keys, &c_hndl) != 0) {
+	if(auth_user(&c_hndl, &c_mgr.handler, &keys, c_hndl.id) != 0) {
 		goto err3;
 	}
 

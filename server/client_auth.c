@@ -10,6 +10,8 @@
 #include <libibur/util.h>
 #include <libibur/endian.h>
 
+#include "client_auth.h"
+
 #include "../crypto/crypto_layer.h"
 #include "../inet/protocol.h"
 #include "../inet/message.h"
@@ -45,7 +47,7 @@ static int check_user(uint8_t *uid, RSA_PUBLIC_KEY *pkey) {
 }
 
 static int prompt_user_register(struct con_handle *con_hndl, struct keyset *keys) {
-	struct message *resp = recv_message(con_hndl, 0);
+	struct message *resp = recv_message(con_hndl, keys, 0);
 
 	if(resp == NULL) {
 		return -1;
@@ -58,21 +60,27 @@ static int prompt_user_register(struct con_handle *con_hndl, struct keyset *keys
 	return 0;
 }
 
-static int register_user(uint8_t *uid, RSA_PUBLIC_KEY *pkey, struct con_handle *con_hndl, struct keyset *keys) {
-	int ret = prompt_user_register(con_hdnl, keys);
+static int user_register(uint8_t *uid, RSA_PUBLIC_KEY *pkey, int fd, struct con_handle *con_hndl, struct keyset *keys) {
+	int ret = prompt_user_register(con_hndl, keys);
 	if(ret != 0) {
 		return ret;
 	}
 
 	/* add them to the user database */
 	struct user u;
-	if(init_user(uid, pkey, &u) != 0) {
+	if(user_init(uid, *pkey, &u) != 0) {
 		return -1;
 	}
 
 	if(user_db_add(u) != 0) {
 		return -1;
 	}
+
+	char uname[65];
+	to_hex(uid, 32, uname);
+	uname[64] = '\0';
+	fprintf(stderr, "%d: registered user %s\n", fd, uname);
+	return 0;
 }
 
 int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, struct keyset *keys, uint8_t *uid) {
@@ -161,7 +169,7 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 	char msg[8] = "cliauth";
 	msg[7] = ret;
 
-	if(send_message(con_hndl, keys, msg, 8) != 0) {
+	if(send_message(con_hndl, keys, (uint8_t *) msg, 8) != 0) {
 		goto err3;
 	}
 
@@ -175,12 +183,12 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 	}
 
 	if(ret == 1) {
-		ret = user_register(uid, &pb_key, cli_hndl);
+		ret = user_register(uid, &pb_key, cli_hndl->fd, con_hndl, keys);
 		if(ret != 0) {
 			if(ret == -1) {
-				fprintf(stderr, "%d: failed to register user\n", cli_hndl->fd)/
+				fprintf(stderr, "%d: failed to register user\n", cli_hndl->fd);
 			}
-			goto err;
+			goto err3;
 		}
 	}
 
@@ -197,7 +205,7 @@ err2:
 	free_message(cli_response);
 err1:
 	memset(challenge, 0, sizeof(challenge));
-	memset(uid, 0, sizeof(uid));
+	memset(uid, 0, sizeof(0x20));
 	return -1;
 }
 

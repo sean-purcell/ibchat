@@ -6,7 +6,7 @@
 
 #include "client_handler.h"
 
-int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, struct keyset *keys);
+int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, struct keyset *keys, uint8_t *uid);
 
 #endif
 

@@ -585,7 +585,7 @@ int user_init(uint8_t *uid, RSA_PUBLIC_KEY pkey, struct user *u) {
 	u->pkey.e = pkey.e;
 	u->pkey.bits = pkey.bits;
 
-	if(bni_cpy(&u->pkey, &pkey) != 0) {
+	if(bni_cpy(&u->pkey.n, &pkey.n) != 0) {
 		return 1;
 	}
 
