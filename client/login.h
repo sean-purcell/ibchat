@@ -14,5 +14,8 @@ struct login_data {
 /* generates a random keyset */
 int gen_login_data(struct login_data *data);
 
+/* prompts an input line from the console */
+char* line_prompt(const char* prompt, const char* confprompt, int hide);
+
 #endif
 

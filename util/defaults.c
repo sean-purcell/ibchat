@@ -3,5 +3,5 @@ const int MAX_HANDSHAKES = 1;
 
 char *DFLT_PORT = "41032";
 
-char *DFLT_ROOT_DIR = "~/ibchat_server/";
+char *DFLT_ROOT_DIR = "~/.ibchat_server/";
 

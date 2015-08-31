@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include <ibcrypt/rsa.h>
+
 #include "crypto_layer.h"
 
 #include "../inet/protocol.h"

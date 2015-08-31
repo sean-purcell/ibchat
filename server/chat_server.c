@@ -26,7 +26,7 @@
 /* private info */
 RSA_KEY server_key;
 char *password;
-/* ---------------------- */
+/* ------------ */
 
 RSA_PUBLIC_KEY server_pub_key;
 
@@ -186,7 +186,7 @@ int process_opts(int argc, char **argv) {
 			opts.port = optarg;
 			break;
 		case 'd':
-			opts.keyfile = optarg;
+			opts.root_dir = optarg;
 			break;
 		case 'n':
 			opts.use_password = 0;

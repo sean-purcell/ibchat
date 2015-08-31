@@ -435,6 +435,8 @@ static int load_user_files() {
 		}
 	}
 
+	closedir(userdir);
+
 	return 0;
 }
 
