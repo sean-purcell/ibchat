@@ -8,7 +8,7 @@
 
 #include <libibur/endian.h>
 
-#include "user.h"
+#include "uname.h"
 
 static int valid_uname_char(char c) {
 	return

@@ -29,7 +29,7 @@ extern uint64_t utime(struct timeval tv);
 # define HS_TRACE() do { } while(0);
 #endif
 
-const char *init = "initiate";
+static const char *init = "initiate";
 
 int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *keys) {
 	/* measure our starting time, we allow maximum 5 seconds for this */

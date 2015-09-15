@@ -17,5 +17,7 @@
 int write_userfile(struct login_data *user, char *filename);
 int read_userfile(struct login_data *user, char *filename);
 
+int user_exist();
+
 #endif
 

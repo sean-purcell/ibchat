@@ -7,57 +7,39 @@
 #include <ibcrypt/zfree.h>
 
 #include "login.h"
+#include "userfile.h"
 
-int register_account(const char *uname, struct account *acc);
-int user_exist(const char *uname);
+int register_account(const char *uname, const char *pass, struct account *acc);
 
 /* the pointers can be left as null to prompt for them */
 int login_account(char *uname, char *pass, struct account *acc) {
 	int exist = user_exist();
 	if(exist == -1) {
-		perror("error reading user database");
+		perror("error finding user file");
 		return -1;
 	}
 	if(exist == 0) {
 		return register_account(uname, pass, acc);
 	}
 
-	int prmpt_un = 0;
 	int prmpt_ps = 0;
-	if(uname == NULL) {
-		prmpt_un = 1;
-		uname = line_prompt("username: ", NULL, 0);
-		if(uname == NULL) {
-			perror("Failed to read username");
-			return -1;
-		}
-	}
-
-	/* identify if the user exists first */
-	int exist = user_exist(uname);
-	if(exist == -1) {
-		perror("Error reading user database");
-		return -1;
-	}
-	if(exist == 0) {
-		/* user does not exist, offer to register them */
-		return register_account(uname, acc);
-	}
 
 	if(pass == NULL) {
 		prmpt_ps = 1;
-		pass = line_prompt("password: ", NULL, 1);
+		pass = line_prompt("password", NULL, 1);
 		if(pass == NULL) {
-			perror("Failed to read password");
+			perror("failed to read password");
 			return -1;
 		}
 	}
+
+	printf("pass: %s\n", pass);
 
 	return 10;
 }
 
-int register_account(const char *uname, struct account *acc) {
-	printf("User not found.  Would you like to register a new user with the name %s? [y/n]", uname);
+int register_account(const char *uname, const char *pass, struct account *acc) {
+	printf("user file not found\ncreate new user? [y/n] ");
 	fflush(stdout);
 
 	char *ans = line_prompt(NULL, NULL, 0);
@@ -66,10 +48,29 @@ int register_account(const char *uname, struct account *acc) {
 		return 1;
 	}
 
-	char *pass = line_prompt("User password", "Confirm password", 1);
+	int prmpt_un = 0;
+	int prmpt_ps = 0;
 
-	printf("Registering %s\n", uname);
-	printf("Pass: %s\n", pass);
+	if(uname == NULL) {
+		prmpt_un = 1;
+		uname = line_prompt("username", NULL, 0);
+		if(uname == NULL) {
+			perror("failed to read username");
+			return -1;
+		}
+	}
+
+	if(pass == NULL) {
+		prmpt_ps = 1;
+		pass = line_prompt("password", "confirm password", 1);
+		if(pass == NULL) {
+			perror("failed to read password");
+			return -1;
+		}
+	}
+
+	printf("registering %s\n", uname);
+	printf("pass: %s\n", pass);
 
 	return 10;
 }
@@ -120,6 +121,7 @@ char* line_prompt(const char* prompt, const char* confprompt, int hide) {
 tryagain:
 	if(ttyout && prompt) {
 		printf("%s: ", prompt);
+		fflush(stdout);
 	}
 
 	pw = 0;
@@ -146,7 +148,7 @@ tryagain:
 
 		if(strcmp(pw, confpw) != 0) {
 			if(ttyout) {
-				printf("Passwords don't match, please try again\n");
+				printf("passwords don't match, please try again\n");
 			}
 			zfree(pw, strlen(pw));
 			zfree(confpw, strlen(confpw));

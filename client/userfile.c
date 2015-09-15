@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <errno.h>
 
 #include <ibcrypt/chacha.h>
 #include <ibcrypt/rand.h>
@@ -15,7 +16,8 @@
 
 #include "userfile.h"
 #include "login.h"
-#include "../util/user.h"
+#include "uname.h"
+#include "ibchat_client.h"
 
 #define IO_CHECK(w, expected, errcode) do { if((w) != (expected)) { ret = (errcode); goto err; } } while(0)
 #define W_CHECK(w, expected) IO_CHECK(w, expected, UF_WRITE_FAIL)
@@ -31,6 +33,41 @@
 
 static uint8_t uf_magic[] = "ibclientuserfile";
 static size_t uf_magic_len = 16;
+
+static const char *UFILE_SUFFIX = "ufile.ibc";
+static char *UFILE_PATH = NULL;
+
+static int init_acc_file_str() {
+	UFILE_PATH = malloc(strlen(ROOT_DIR) + strlen(UFILE_SUFFIX) + 1);
+	if(UFILE_PATH == NULL) {
+		return -1;
+	}
+
+	strcpy(UFILE_PATH, ROOT_DIR);
+	strcpy(&UFILE_PATH[strlen(ROOT_DIR)], UFILE_SUFFIX);
+	UFILE_PATH[strlen(ROOT_DIR) + strlen(UFILE_SUFFIX)] = '\0';
+
+	return 0;
+}
+
+int user_exist() {
+	if(init_acc_file_str() != 0) {
+		return -1;
+	}
+
+	/* check if theres a file at the expected address */
+	FILE* afile = fopen(UFILE_PATH, "rb");
+	if(afile == NULL) {
+		if(errno == ENOENT) {
+			return 0;
+		} else {
+			return -1;
+		}
+	}
+	fclose(afile);
+
+	return 1;
+}
 
 int write_userfile(struct login_data *user, char *filename) {
 	FILE *out = NULL;
