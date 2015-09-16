@@ -71,69 +71,68 @@ int user_exist() {
 
 int write_userfile(struct login_data *user, char *filename) {
 	FILE *out = NULL;
-	uint8_t uid[32];
 	uint8_t mac1[32];
 	uint8_t mac2[32];
-	uint8_t salt[32];
 	uint8_t sizebuf[8];
-	uint8_t scrypt_out[96];
-	uint8_t *pw_check = &scrypt_out[0x00];
-	uint8_t *symm_key = &scrypt_out[0x20];
-	uint8_t *hmac_key = &scrypt_out[0x40];
+	uint8_t noncebuf[8];
 	uint8_t *payload = NULL;
-	uint64_t size = 0;
+	uint64_t size = 0, num_acc = 0, idx = 0;
+	uint8_t *payload_ptr;
 	HMAC_SHA256_CTX ctx, tmp_ctx;
+	struct account *accounts;
 
 	int ret = 0;
 
-	gen_uid(user->uname, strlen(user->uname), uid);
-
-	if(cs_rand(salt, 32) != 0) {
-		ret = UF_PROG_FAIL;
-		goto err;
+	size = 8;
+	num_acc = 0;
+	accounts = user->server_accounts;
+	while(accounts != NULL) {
+		size += account_bin_size(accounts);
+		num_acc++;
+		accounts = accounts->next;
 	}
 
-	if(scrypt(user->pass, strlen(user->pass), salt, 32, (uint64_t)1 << 16,
-		8, 1, 96, scrypt_out) != 0) {
-		ret = UF_PROG_FAIL;
-		goto err;
-	}
-
-	size = 32 + 32 + rsa_prikey_bufsize(user->id.bits);
 	encbe64(size, sizebuf);
+	encbe64(user->nonce, noncebuf);
 
 	if((payload = malloc(size)) == NULL) {
 		ret = UF_MEM_FAIL;
 		goto err;
 	}
 
-	memcpy(&payload[0x00], user->symm_seed, 0x20);
-	memcpy(&payload[0x20], user->hmac_seed, 0x20);
+	encbe64(num_acc, payload);
+	payload_ptr = &payload[8];
+	accounts = user->server_accounts;
+	while(accounts != NULL) {
+		payload_ptr = account_write_bin(accounts, payload_ptr);
+		accounts = accounts->next;
+	}
 
-	if(rsa_prikey2wire(&user->id, &payload[0x40], size - 0x40) != 0) {
+	if(idx != size) {
 		ret = UF_PROG_FAIL;
 		goto err;
 	}
 
-	chacha_enc(symm_key, 32, 0, payload, payload, size);
+	/* it is the responsibility of the caller to handle the nonce properly */
+	chacha_enc(user->symm_key, 32, user->nonce, payload, payload, size);
 
 	if((out = fopen(filename, "wb")) == NULL) {
 		ret = UF_OPEN_FAIL;
 		goto err;
 	}
 
-	hmac_sha256_init(&ctx, hmac_key, 32);
+	hmac_sha256_init(&ctx, user->hmac_key, 32);
 
 	WRITE(uf_magic, uf_magic_len, out);
 	hmac_sha256_update(&ctx, uf_magic, uf_magic_len);
-	WRITE(uid, 32, out);
-	hmac_sha256_update(&ctx, uid, 32);
-	WRITE(salt, 32, out);
-	hmac_sha256_update(&ctx, salt, 32);
-	WRITE(pw_check, 32, out);
-	hmac_sha256_update(&ctx, pw_check, 32);
+	WRITE(user->salt, 32, out);
+	hmac_sha256_update(&ctx, user->salt, 32);
+	WRITE(user->pw_check, 32, out);
+	hmac_sha256_update(&ctx, user->pw_check, 32);
 	WRITE(sizebuf, 8, out);
 	hmac_sha256_update(&ctx, sizebuf, 8);
+	WRITE(noncebuf, 8, out);
+	hmac_sha256_update(&ctx, noncebuf, 8);
 
 	tmp_ctx = ctx;
 	hmac_sha256_final(&tmp_ctx, mac1);
@@ -152,9 +151,10 @@ int write_userfile(struct login_data *user, char *filename) {
 		goto err;
 	}
 
+	out = NULL;
+
 err: /* most of the buffers don't need to be cleared as they aren't private */
 	if(out) fclose(out);
-	memsets(scrypt_out, 0, 96);
 	if(payload) zfree(payload, size);
 
 	return ret;
@@ -163,22 +163,22 @@ err: /* most of the buffers don't need to be cleared as they aren't private */
 int read_userfile(struct login_data *user, char *filename) {
 	FILE *in = NULL;
 	uint8_t magic_buf[uf_magic_len];
-	uint8_t uid[32];
-	uint8_t uid_f[32];
 	uint8_t mac1[32];
 	uint8_t mac2[32];
 	uint8_t mac1_f[32];
 	uint8_t mac2_f[32];
 	uint8_t salt[32];
 	uint8_t sizebuf[8];
+	uint8_t noncebuf[8];
 	uint8_t scrypt_out[96];
 	uint8_t *pw_check = &scrypt_out[0x00];
 	uint8_t *symm_key = &scrypt_out[0x20];
 	uint8_t *hmac_key = &scrypt_out[0x40];
 	uint8_t pw_check_f[32];
-	uint8_t *payload = NULL;
-	uint64_t size = 0;
+	uint8_t *payload = NULL, *payload_ptr;
+	uint64_t size = 0, num_acc, idx;
 	HMAC_SHA256_CTX ctx, tmp_ctx;
+	struct account **accounts;
 
 	int ret = 0;
 
@@ -190,13 +190,6 @@ int read_userfile(struct login_data *user, char *filename) {
 	READ(magic_buf, uf_magic_len, in);
 	if(memcmp_ct(uf_magic, magic_buf, uf_magic_len) != 0) {
 		ret = UF_INV_MAGIC;
-		goto err;
-	}
-
-	gen_uid(user->uname, strlen(user->uname), uid);
-	READ(uid_f, 32, in);
-	if(memcmp_ct(uid_f, uid, 32) != 0) {
-		ret = UF_INV_UID;
 		goto err;
 	}
 
@@ -215,14 +208,15 @@ int read_userfile(struct login_data *user, char *filename) {
 	}
 
 	READ(sizebuf, 8, in);
+	READ(noncebuf, 8, in);
 	READ(mac1_f, 32, in);
 
 	hmac_sha256_init(&ctx, hmac_key, 32);
 	hmac_sha256_update(&ctx, uf_magic, uf_magic_len);
-	hmac_sha256_update(&ctx, uid, 32);
 	hmac_sha256_update(&ctx, salt, 32);
 	hmac_sha256_update(&ctx, pw_check_f, 32);
 	hmac_sha256_update(&ctx, sizebuf, 8);
+	hmac_sha256_update(&ctx, noncebuf, 8);
 	tmp_ctx = ctx;
 	hmac_sha256_final(&tmp_ctx, mac1);
 
@@ -249,13 +243,19 @@ int read_userfile(struct login_data *user, char *filename) {
 		goto err;
 	}
 
-	chacha_dec(symm_key, 32, 0, payload, payload, size);
+	user->nonce = decbe64(noncebuf);
+	chacha_dec(symm_key, 32, user->nonce, payload, payload, size);
 
-	memcpy(user->symm_seed, &payload[0x00], 0x20);
-	memcpy(user->hmac_seed, &payload[0x20], 0x20);
-	if(rsa_wire2prikey(&payload[0x40], size - 0x40, &user->id) != 0) {
-		ret = UF_PROG_FAIL;
-		goto err;
+	num_acc = decbe64(payload);
+	accounts = &user->server_accounts;
+	payload_ptr = &payload[8];
+	for(idx = 0; idx < num_acc; idx++) {
+		payload_ptr = account_parse_bin(accounts, payload_ptr);
+		if(payload_ptr == NULL) {
+			ret = UF_PROG_FAIL;
+			goto err;
+		}
+		accounts = &((*accounts)->next);
 	}
 
 	if(fclose(in) != 0) {
@@ -269,7 +269,6 @@ err:
 	memsets(scrypt_out, 0, 96);
 	memsets(mac1, 0, 32);
 	memsets(mac2, 0, 32);
-	memsets(uid, 0, 32);
 	if(payload) zfree(payload, size);
 
 	return ret;
