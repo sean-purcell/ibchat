@@ -38,6 +38,9 @@ static const char *UFILE_SUFFIX = "ufile.ibc";
 static char *UFILE_PATH = NULL;
 
 static int init_acc_file_str() {
+	if(UFILE_PATH != NULL) {
+		return 0;
+	}
 	UFILE_PATH = malloc(strlen(ROOT_DIR) + strlen(UFILE_SUFFIX) + 1);
 	if(UFILE_PATH == NULL) {
 		return -1;
@@ -69,14 +72,17 @@ int user_exist() {
 	return 1;
 }
 
-int write_userfile(struct login_data *user, char *filename) {
+int write_userfile(struct profile *user) {
+	if(init_acc_file_str() != 0) {
+		return -1;
+	}
 	FILE *out = NULL;
 	uint8_t mac1[32];
 	uint8_t mac2[32];
 	uint8_t sizebuf[8];
 	uint8_t noncebuf[8];
 	uint8_t *payload = NULL;
-	uint64_t size = 0, num_acc = 0, idx = 0;
+	uint64_t size = 0, num_acc = 0;
 	uint8_t *payload_ptr;
 	HMAC_SHA256_CTX ctx, tmp_ctx;
 	struct account *accounts;
@@ -108,7 +114,7 @@ int write_userfile(struct login_data *user, char *filename) {
 		accounts = accounts->next;
 	}
 
-	if(idx != size) {
+	if(payload_ptr != (payload + size)) {
 		ret = UF_PROG_FAIL;
 		goto err;
 	}
@@ -116,7 +122,7 @@ int write_userfile(struct login_data *user, char *filename) {
 	/* it is the responsibility of the caller to handle the nonce properly */
 	chacha_enc(user->symm_key, 32, user->nonce, payload, payload, size);
 
-	if((out = fopen(filename, "wb")) == NULL) {
+	if((out = fopen(UFILE_PATH, "wb")) == NULL) {
 		ret = UF_OPEN_FAIL;
 		goto err;
 	}
@@ -160,7 +166,10 @@ err: /* most of the buffers don't need to be cleared as they aren't private */
 	return ret;
 }
 
-int read_userfile(struct login_data *user, char *filename) {
+int read_userfile(struct profile *user) {
+	if(init_acc_file_str() != 0) {
+		return -1;
+	}
 	FILE *in = NULL;
 	uint8_t magic_buf[uf_magic_len];
 	uint8_t mac1[32];
@@ -182,7 +191,7 @@ int read_userfile(struct login_data *user, char *filename) {
 
 	int ret = 0;
 
-	if((in = fopen(filename, "rb")) == NULL) {
+	if((in = fopen(UFILE_PATH, "rb")) == NULL) {
 		ret = UF_OPEN_FAIL;
 		goto err;
 	}

@@ -5,23 +5,24 @@
 
 #include <ibcrypt/rand.h>
 #include <ibcrypt/zfree.h>
+#include <ibcrypt/scrypt.h>
 
 #include <libibur/endian.h>
 
 #include "login.h"
 #include "userfile.h"
 
-int register_account(const char *uname, const char *pass, struct account *acc);
+int register_profile(char *pass, struct profile *acc);
 
 /* the pointers can be left as null to prompt for them */
-int login_account(char *uname, char *pass, struct account *acc) {
+int login_profile(char *pass, struct profile *prof) {
 	int exist = user_exist();
 	if(exist == -1) {
 		perror("error finding user file");
 		return -1;
 	}
 	if(exist == 0) {
-		return register_account(uname, pass, acc);
+		return register_profile(pass, prof);
 	}
 
 	int prmpt_ps = 0;
@@ -35,13 +36,34 @@ int login_account(char *uname, char *pass, struct account *acc) {
 		}
 	}
 
-	printf("pass: %s\n", pass);
+	if(prmpt_ps) {
+		prof->pass = pass;
+	} else {
+		prof->pass = strdup(pass);
+		if(prof->pass == NULL) {
+			perror("failed to duplicate password");
+			return -1;
+		}
+	}
 
-	return 10;
+	int ret;
+	if((ret = read_userfile(prof)) != 0) {
+		if(ret == UF_INV_PASS) {
+			printf("invalid password or user file\n");
+		} else {
+			fprintf(stderr, "failed to read userfile: %d\n", ret);
+		}
+		goto err;
+	}
+
+	return 0;
+err:
+	zfree(prof->pass, strlen(prof->pass));
+	return -1;
 }
 
-int register_account(const char *uname, const char *pass, struct account *acc) {
-	printf("user file not found\ncreate new user? [y/n] ");
+int register_profile(char *pass, struct profile *prof) {
+	printf("profile not found\ncreate new profile? [y/n] ");
 	fflush(stdout);
 
 	char *ans = line_prompt(NULL, NULL, 0);
@@ -50,17 +72,7 @@ int register_account(const char *uname, const char *pass, struct account *acc) {
 		return 1;
 	}
 
-	int prmpt_un = 0;
 	int prmpt_ps = 0;
-
-	if(uname == NULL) {
-		prmpt_un = 1;
-		uname = line_prompt("username", NULL, 0);
-		if(uname == NULL) {
-			perror("failed to read username");
-			return -1;
-		}
-	}
 
 	if(pass == NULL) {
 		prmpt_ps = 1;
@@ -71,22 +83,53 @@ int register_account(const char *uname, const char *pass, struct account *acc) {
 		}
 	}
 
-	printf("registering %s\n", uname);
-	printf("pass: %s\n", pass);
+	if(prmpt_ps) {
+		prof->pass = pass;
+	} else {
+		prof->pass = strdup(pass);
+		if(prof->pass == NULL) {
+			perror("failed to duplicate password");
+			return -1;
+		}
+	}
 
-	return 10;
+	if(gen_profile(prof)) {
+		fprintf(stderr, "failed to generate profile data\n");
+		goto err;
+	}
+	int ret;
+	if((ret = write_userfile(prof)) != 0) {
+		fprintf(stderr, "failed to write userfile: %d\n", ret);
+		goto err;
+	}
+
+	return 0;
+
+err:
+	zfree(prof->pass, strlen(prof->pass));
+	return -1;
 }
 
-int gen_login_data(struct login_data *data) {
-	if(cs_rand(data->symm_seed, 32) != 0) {
-		return 1;
+/* data->pass should be prepopulated with a null terminated password */
+int gen_profile(struct profile *data) {
+	if(cs_rand(data->salt, 32) != 0) {
+		return -1;
 	}
-	if(cs_rand(data->hmac_seed, 32) != 0) {
-		return 1;
+	data->nonce = 0;
+	data->server_accounts = NULL;
+
+	uint8_t scrypt_out[96];
+
+	if(scrypt(data->pass, strlen(data->pass), data->salt, 32,
+		(uint64_t)1 << 16, 8, 1, 96, scrypt_out) != 0) {
+		return -1;
 	}
-	if(rsa_gen_key(&data->id, 2048, 65537) != 0) {
-		return 1;
-	}
+
+	memcpy(data->pw_check, &scrypt_out[ 0], 32);
+	memcpy(data->symm_key, &scrypt_out[32], 32);
+	memcpy(data->hmac_key, &scrypt_out[64], 32);
+
+	memset(scrypt_out, 0, 96);
 
 	return 0;
 }

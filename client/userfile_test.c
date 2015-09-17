@@ -10,8 +10,8 @@
 #include "../util/user.h"
 
 int main() {
-	struct login_data data;
-	struct login_data data_f;
+	struct profile data;
+	struct profile data_f;
 
 	char *username;
 	char *password;
@@ -21,7 +21,7 @@ int main() {
 
 	int ret;
 
-	if(gen_login_data(&data) != 0) {
+	if(gen_profile(&data) != 0) {
 		fprintf(stderr, "failed to generate login data\n");
 		return 1;
 	}

@@ -1,6 +1,5 @@
 #include <stdio.h>
 
-#include "account_file.h"
 #include "login.h"
 #include "connect_server.h"
 #include "ibchat_client.h"
@@ -13,10 +12,10 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	struct account acc;
+	struct profile prof;
 
 	/* log the user in */
-	if(login_account(NULL, NULL, &acc)) {
+	if(login_profile(NULL, &prof)) {
 		return 1;
 	}
 }

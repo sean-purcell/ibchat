@@ -16,9 +16,8 @@ struct account {
 	struct account *next;
 };
 
-struct login_data {
+struct profile {
 	char *pass;
-	RSA_KEY id;
 	uint8_t salt[32];
 	uint8_t pw_check[32];
 	uint8_t symm_key[32];
@@ -28,10 +27,10 @@ struct login_data {
 	struct account *server_accounts;
 };
 
-int login_account(char *uname, char *pass, struct account *acc);
+int login_profile(char *pass, struct profile *acc);
 
 /* generates a random keyset */
-int gen_login_data(struct login_data *data);
+int gen_profile(struct profile *data);
 
 /* prompts an input line from the console */
 char* line_prompt(const char* prompt, const char* confprompt, int hide);

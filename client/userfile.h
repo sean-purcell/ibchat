@@ -14,8 +14,8 @@
 #define UF_INV_MAGIC   9
 #define UF_INV_UID    10
 
-int write_userfile(struct login_data *user, char *filename);
-int read_userfile(struct login_data *user, char *filename);
+int write_userfile(struct profile *user);
+int read_userfile(struct profile *user);
 
 int user_exist();
 
