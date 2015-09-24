@@ -18,9 +18,9 @@ int connect_server(char *addr, struct con_handle *con_hndl, RSA_PUBLIC_KEY *serv
 	server = client_connect(addr, DFLT_PORT);
 	if(server.fd == -1) {
 		if(errno == 0) {
-			fprintf(stderr, "Could not find server at given address\n");	
+			fprintf(stderr, "could not find server at given address\n");
 		} else {
-			perror("Could not connect to server");
+			perror("could not connect to server");
 		}
 
 		return 1;
@@ -37,17 +37,17 @@ int connect_server(char *addr, struct con_handle *con_hndl, RSA_PUBLIC_KEY *serv
 
 	ret = client_handshake(con_hndl, server_key, keys, &res);
 	if(ret == -1) {
-		fprintf(stderr, "A program error occurred during handshake\n");
+		fprintf(stderr, "a program error occurred during handshake\n");
 
 		goto err;
 	} else if(ret == 1) {
-		fprintf(stderr, "Server failed to perform handshake\n");
+		fprintf(stderr, "server failed to perform handshake\n");
 
 		goto err;
 	}
 
 	if(res != 0) {
-		fprintf(stderr, "Server performed invalid handshake\n");
+		fprintf(stderr, "server performed invalid handshake\n");
 
 		ret = 2;
 

@@ -5,3 +5,5 @@ char *DFLT_PORT = "41032";
 
 char *DFLT_ROOT_DIR = "~/.ibchat_server/";
 
+char *DFLT_ADDR = "ibchat.seanp.xyz";
+

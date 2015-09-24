@@ -15,6 +15,7 @@
 #include <libibur/util.h>
 
 #include "userfile.h"
+#include "account.h"
 #include "login.h"
 #include "uname.h"
 #include "ibchat_client.h"

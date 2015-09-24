@@ -10,5 +10,7 @@ extern char *DFLT_PORT;
 
 extern char *DFLT_ROOT_DIR;
 
+extern char *DFLT_ADDR;
+
 #endif
 
