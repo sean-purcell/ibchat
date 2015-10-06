@@ -110,7 +110,6 @@ int main(int argc, char **argv) {
 	free(server_key_buf);
 
 	end_handler(&handler);
-	destroy_handler(&handler);
 
 	return 0;
 
@@ -120,7 +119,6 @@ efree:
 	free(server_key_buf);
 ehandshake:
 	end_handler(&handler);
-	destroy_handler(&handler);
 
 	return 1;
 }

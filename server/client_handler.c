@@ -159,7 +159,6 @@ void *client_handler(void *_arg) {
 err3:
 	pthread_cleanup_pop(1);
 err2:
-	destroy_handler(&c_mgr.handler);
 	destroy_client_handler(&c_hndl);
 err1:
 	printf("%d: exiting\n", fd);
