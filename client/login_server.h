@@ -18,5 +18,7 @@ struct server_connection {
 
 int create_account(struct account *acc, struct server_connection *sc);
 
+void cleanup_server_connection(struct server_connection *sc);
+
 #endif
 

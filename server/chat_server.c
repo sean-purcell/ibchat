@@ -14,7 +14,11 @@
 #include <sys/stat.h>
 
 #include <ibcrypt/rsa.h>
+#include <ibcrypt/rsa_util.h>
+#include <ibcrypt/sha256.h>
 #include <ibcrypt/zfree.h>
+
+#include <libibur/util.h>
 
 #include "client_handler.h"
 #include "user_db.h"
@@ -274,6 +278,29 @@ int load_server_key(char *keyfile, char *password, RSA_KEY *server_key) {
 	if(rsa_pub_key(server_key, &server_pub_key) != 0) {
 		fprintf(stderr, "failed to create public key\n");
 		return 1;
+	}
+
+	/* print the fingerprint of the key */
+	{
+		uint64_t len = rsa_pubkey_bufsize(server_pub_key.bits);
+		uint8_t* key_bin = malloc(len);
+		if(key_bin == NULL) {
+			fprintf(stderr, "failed to allocate memory\n");
+			return 1;
+		}
+		uint8_t hash[32];
+		char hex[65];
+
+		rsa_pubkey2wire(&server_pub_key, key_bin, len);
+		sha256(key_bin, len, hash);
+		to_hex(hash, 32, hex);
+		hex[64] = '\0';
+
+		printf("server fingerprint:\n"
+			"%s\n",
+			hex);
+
+		free(key_bin);
 	}
 
 	return 0;

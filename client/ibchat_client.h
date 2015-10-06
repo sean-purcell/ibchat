@@ -5,5 +5,7 @@ extern char *ROOT_DIR;
 
 extern char *PORT;
 
+extern int userfile_dirty;
+
 #endif
 

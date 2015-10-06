@@ -108,7 +108,8 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 	}
 
 	/* now we wait for the response */
-	/* we shouldn't wait more than 10 seconds, the client shouldn't be busy */
+	/* we should wait arbitrarily long for the response as long as the client
+	 * stays connected.  they could be verifying the server's key. */
 
 	/* handle response */
 	{

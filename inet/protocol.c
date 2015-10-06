@@ -172,7 +172,9 @@ void add_message(struct con_handle *con, struct message *m) {
 static void handler_cleanup(void *_con) {
 	struct con_handle *con = ((struct con_handle *) _con);
 	end_handler(con);
-	close(con->sockfd);
+	if(con->sockfd != -1) close(con->sockfd);
+	con->sockfd = -1;
+	destroy_handler(con);
 }
 
 /* handles a connection to the client or server, made to be run as a thread */
@@ -317,10 +319,8 @@ error:
 	fprintf(stderr, "%d: handler exiting: %s\n", con->sockfd,
 		strerror(errno));
 #endif
-	end_handler(con);
 exit:
-	close(con->sockfd);
-	pthread_cleanup_pop(0);
+	pthread_cleanup_pop(1);
 	return NULL;
 }
 

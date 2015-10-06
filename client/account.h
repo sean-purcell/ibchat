@@ -7,9 +7,10 @@ struct account {
 	uint64_t u_len;
 	uint64_t a_len;
 	uint64_t k_len;
-	char *uname;
-	char *addr;
-	uint8_t *key_bin;
+	char *uname; /* username */
+	char *addr; /* server address */
+	uint8_t *key_bin; /* private key binary */
+	uint8_t sfing[32]; /* server key hash */
 
 	struct account *next;
 };

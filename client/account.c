@@ -116,7 +116,7 @@ uint8_t *account_parse_bin(struct account **acc, uint8_t *ptr) {
 	if(ap->addr == NULL) {
 		return NULL;
 	}
-	ap->key_bin = malloc(ap->k_len + 1);
+	ap->key_bin = malloc(ap->k_len);
 	if(ap->key_bin == NULL) {
 		return NULL;
 	}

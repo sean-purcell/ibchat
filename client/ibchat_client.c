@@ -11,6 +11,9 @@
 
 char *ROOT_DIR = "~/.ibchat/";
 
+/* this should be set to 1 by any function that modifies the userfile */
+int userfile_dirty = 0;
+
 static int expand_root_dir();
 static int check_root_dir();
 int init() {
