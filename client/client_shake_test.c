@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
 	printf("connected to %s\n", server.address);
 
 	/* initiate handshake */
-	struct con_handle handler;
+	struct con_handle *handler;
 	struct keyset keys;
 	RSA_PUBLIC_KEY server_key;
 	uint8_t *server_key_buf;
@@ -48,8 +48,7 @@ int main(int argc, char **argv) {
 
 	pthread_t handler_thread;
 
-	init_handler(&handler, server.fd);
-	pthread_create(&handler_thread, NULL, handle_connection, &handler);
+	launch_handler(&handler_thread, &handler, server.fd);
 
 	ret = client_handshake(&handler, &server_key, &keys, &res);
 	if(ret == -1) {

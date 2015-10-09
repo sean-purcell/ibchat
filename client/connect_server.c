@@ -12,7 +12,7 @@
 #include "../util/defaults.h"
 
 /* Returns -1 for programatic error, 1 for server error */
-int connect_server(char *addr, struct con_handle *con_hndl, RSA_PUBLIC_KEY *server_key, struct keyset *keys) {
+int connect_server(char *addr, struct con_handle **con_hndl, RSA_PUBLIC_KEY *server_key, struct keyset *keys) {
 	struct sock server;
 
 	server = client_connect(addr, DFLT_PORT);
@@ -32,10 +32,9 @@ int connect_server(char *addr, struct con_handle *con_hndl, RSA_PUBLIC_KEY *serv
 
 	pthread_t handler_thread;
 
-	init_handler(con_hndl, server.fd);
-	pthread_create(&handler_thread, NULL, handle_connection, con_hndl);
+	launch_handler(&handler_thread, con_hndl, server.fd);
 
-	ret = client_handshake(con_hndl, server_key, keys, &res);
+	ret = client_handshake(*con_hndl, server_key, keys, &res);
 	if(ret == -1) {
 		fprintf(stderr, "a program error occurred during handshake\n");
 
@@ -58,7 +57,7 @@ int connect_server(char *addr, struct con_handle *con_hndl, RSA_PUBLIC_KEY *serv
 	return 0;
 
 err:
-	end_handler(con_hndl);
+	end_handler(*con_hndl);
 	return ret;
 }
 

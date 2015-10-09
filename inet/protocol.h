@@ -18,11 +18,10 @@ struct con_handle {
 
 void *handle_connection(void *_con);
 
-int launch_handler(pthread_t *thread, struct con_handle *con);
+int launch_handler(pthread_t *thread, struct con_handle **con, int fd);
 
 int handler_status(struct con_handle *con);
 void end_handler(struct con_handle *con);
-void init_handler(struct con_handle *con, int sockfd);
 void destroy_handler(struct con_handle *con);
 
 struct message *get_message(struct con_handle *con, uint64_t timeout);

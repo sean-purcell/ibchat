@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
 
 	RSA_KEY private_key;
 	RSA_PUBLIC_KEY server_key;
-	struct con_handle handler;
+	struct con_handle *handler;
 	struct keyset keys;
 	uint8_t *server_key_buf;
 	uint64_t server_key_bufsize;
@@ -71,8 +71,7 @@ int main(int argc, char **argv) {
 
 	pthread_t handler_thread;
 
-	init_handler(&handler, client.fd);
-	pthread_create(&handler_thread, NULL, handle_connection, &handler);
+	launch_handler(&handler_thread, &handler, client.fd);
 
 	ret = server_handshake(&handler, &private_key, &keys);
 	if(ret == -1) {

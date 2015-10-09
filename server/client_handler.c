@@ -105,14 +105,14 @@ static void destroy_client_handler(struct client_handler *handler) {
 
 /* client handler cleanup */
 struct ch_manager {
-	struct con_handle handler;
+	struct con_handle *handler;
 	pthread_t thread;
 };
 
 void ch_cleanup_end_handler(void *_arg) {
 	struct ch_manager *arg = (struct ch_manager *)_arg;
 
-	end_handler(&arg->handler);
+	end_handler(arg->handler);
 	pthread_join(arg->thread, NULL);
 }
 
@@ -133,22 +133,21 @@ void *client_handler(void *_arg) {
 	}
 
 	/* initiate the connection handler thread */
-	init_handler(&c_mgr.handler, c_hndl.fd);
-	if(launch_handler(&ch_thread, &c_mgr.handler) != 0) {
+	if(launch_handler(&ch_thread, &c_mgr.handler, fd) != 0) {
 		fprintf(stderr, "%d: failed to launch handler thread\n", fd);
 		goto err2;
 	}
 	pthread_cleanup_push(ch_cleanup_end_handler, &c_mgr);
 
 	/* complete the handshake */
-	if((ret = client_handler_handshake(&c_mgr.handler, &keys)) != 0) {
+	if((ret = client_handler_handshake(c_mgr.handler, &keys)) != 0) {
 		printf("%d: failed to complete handshake: %d\n", fd, ret);
 		goto err3;
 	}
 	printf("%d: successfully completed handshake\n", fd);
 
 	/* now we can start communicating with this user */
-	if(auth_user(&c_hndl, &c_mgr.handler, &keys, c_hndl.id) != 0) {
+	if(auth_user(&c_hndl, c_mgr.handler, &keys, c_hndl.id) != 0) {
 		goto err3;
 	}
 

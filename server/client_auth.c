@@ -113,7 +113,7 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 
 	/* handle response */
 	{
-		cli_response = recv_message(con_hndl, keys, 10000000ULL);
+		cli_response = recv_message(con_hndl, keys, 0);
 		if(cli_response == NULL) {
 			ERR("no auth response");
 			goto err1;

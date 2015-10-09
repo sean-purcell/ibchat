@@ -76,7 +76,25 @@ struct timeval tvtime(uint64_t utime) {
 	return tv;
 }
 
-int launch_handler(pthread_t *thread, struct con_handle *con) {
+void init_handler(struct con_handle *con, int sockfd) {
+	con->sockfd = sockfd;
+	con->out_queue = EMPTY_MESSAGE_QUEUE;
+	con->in_queue = EMPTY_MESSAGE_QUEUE;
+	pthread_mutex_init(&con->out_mutex, NULL);
+	pthread_mutex_init(&con->in_mutex, NULL);
+	pthread_mutex_init(&con->kill_mutex, NULL);
+	con->ka_last_recv = 0;
+	con->kill = 0;
+}
+
+int launch_handler(pthread_t *thread, struct con_handle **_con, int fd) {
+	struct con_handle *con = malloc(sizeof(struct con_handle));
+	if(con == NULL) {
+		return -1;
+	}
+	*_con = con;
+	init_handler(con, fd);
+
 	pthread_attr_t attr;
 	if(pthread_attr_init(&attr) != 0) {
 		return -1;
@@ -108,21 +126,12 @@ int handler_status(struct con_handle *con) {
 	return s;
 }
 
-void init_handler(struct con_handle *con, int sockfd) {
-	con->sockfd = sockfd;
-	con->out_queue = EMPTY_MESSAGE_QUEUE;
-	con->in_queue = EMPTY_MESSAGE_QUEUE;
-	pthread_mutex_init(&con->out_mutex, NULL);
-	pthread_mutex_init(&con->in_mutex, NULL);
-	pthread_mutex_init(&con->kill_mutex, NULL);
-	con->ka_last_recv = 0;
-	con->kill = 0;
-}
-
 void destroy_handler(struct con_handle *con) {
 	pthread_mutex_destroy(&con->out_mutex);
 	pthread_mutex_destroy(&con->in_mutex);
 	pthread_mutex_destroy(&con->kill_mutex);
+
+	free(con);
 }
 
 struct message *get_message(struct con_handle *con, uint64_t timeout) {
