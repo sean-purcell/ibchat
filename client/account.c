@@ -36,7 +36,7 @@ int pick_account(struct profile *prof, struct account *acc) {
 	printf("%4d: create a new account\n", 0);
 
 	while(acc_list) {
-		printf("%4llu: %s, %s\n", (long long unsigned int) idx, acc_list->uname, acc_list->addr);
+		printf("%4" PRIu64 ": %s, %s\n", idx, acc_list->uname, acc_list->addr);
 		idx++;
 		acc_list = acc_list->next;
 	}
@@ -65,7 +65,7 @@ int pick_account(struct profile *prof, struct account *acc) {
 			acc_list = acc_list->next;
 		}
 
-		fprintf(stderr, "failed to find account corresponding to selection: %llu\n", (long long unsigned int) selection);
+		fprintf(stderr, "failed to find account corresponding to selection: %" PRIu64 "\n", selection);
 		return -1;
 
 		found:;
@@ -83,6 +83,7 @@ uint64_t account_bin_size(struct account *acc) {
 	size += acc->u_len;
 	size += acc->a_len;
 	size += acc->k_len;
+	size += 0x20;
 
 	return size;
 }
@@ -96,6 +97,7 @@ uint8_t *account_write_bin(struct account *acc, uint8_t *ptr) {
 	memcpy(ptr, acc->uname, acc->u_len); ptr += acc->u_len;
 	memcpy(ptr, acc->addr, acc->a_len); ptr += acc->a_len;
 	memcpy(ptr, acc->key_bin, acc->k_len); ptr += acc->k_len;
+	memcpy(ptr, acc->sfing, 0x20); ptr += 0x20;
 
 	return ptr;
 }
@@ -104,6 +106,10 @@ uint8_t *account_write_bin(struct account *acc, uint8_t *ptr) {
  * NULL if it failed */
 uint8_t *account_parse_bin(struct account **acc, uint8_t *ptr) {
 	struct account *ap = malloc(sizeof(struct account));
+	if(ap == NULL) {
+		return NULL;
+	}
+
 	ap->u_len = decbe64(ptr); ptr += 8;
 	ap->a_len = decbe64(ptr); ptr += 8;
 	ap->k_len = decbe64(ptr); ptr += 8;
@@ -132,6 +138,8 @@ uint8_t *account_parse_bin(struct account **acc, uint8_t *ptr) {
 	memcpy(ap->key_bin, ptr, ap->k_len);
 	ptr += ap->k_len;
 
+	memcpy(ap->sfing, ptr, 0x20); ptr += 0x20;
+
 	*acc = ap;
 	return ptr;
 }
@@ -149,6 +157,6 @@ void account_free_list(struct account *acc) {
 		struct account *next = acc->next;
 		account_free(acc);
 		acc = next;
-	}		
+	}
 }
 
