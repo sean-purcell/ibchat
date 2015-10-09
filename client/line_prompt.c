@@ -15,7 +15,7 @@ char* line_prompt(const char* prompt, const char* confprompt, int hide) {
 	char *pw;
 	char *confpw;
 	struct termios term, term_old;
-	int ttyin, ttyout;
+	int ttyin = 0, ttyout;
 	size_t read;
 
 	/* try to open the terminal */

@@ -36,7 +36,7 @@ int pick_account(struct profile *prof, struct account *acc) {
 	printf("%4d: create a new account\n", 0);
 
 	while(acc_list) {
-		printf("%4llu: %s, %s\n", idx, acc_list->uname, acc_list->addr);
+		printf("%4llu: %s, %s\n", (long long unsigned int) idx, acc_list->uname, acc_list->addr);
 		idx++;
 		acc_list = acc_list->next;
 	}
@@ -65,7 +65,7 @@ int pick_account(struct profile *prof, struct account *acc) {
 			acc_list = acc_list->next;
 		}
 
-		fprintf(stderr, "failed to find account corresponding to selection: %llu\n", selection);
+		fprintf(stderr, "failed to find account corresponding to selection: %llu\n", (long long unsigned int) selection);
 		return -1;
 
 		found:;
