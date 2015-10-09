@@ -13,7 +13,6 @@
 #include <libibur/util.h>
 
 #include "keyfile.h"
-#include "../util/getpass.h"
 
 #define IO_CHECK(w, expected, errcode) do { if((w) != (expected)) { ret = (errcode); goto err; } } while(0)
 #define W_CHECK(w, expected) IO_CHECK(w, expected, WRITE_FAIL)

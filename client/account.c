@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <limits.h>
 
 #include <ibcrypt/zfree.h>
@@ -9,8 +10,9 @@
 
 #include "account.h"
 #include "login.h"
-#include "line_prompt.h"
 #include "login_server.h"
+
+#include "../util/line_prompt.h"
 
 int pick_account(struct profile *prof, struct account *acc) {
 	if(prof->server_accounts == NULL) {

@@ -23,8 +23,9 @@ encrypted data:
 Y times:
 0x000-0x008 length of username
 0x008-0x010 length of server address
-0x010-0x018 length of public key
+0x010-0x018 length of private key
 0x018-    X username
     X-    Y server address
-    Y-    Z public key
+    Y-    Z private key
+    Z- Z+32 server public key fingerprint
 

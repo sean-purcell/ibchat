@@ -12,9 +12,10 @@
 #include "../util/defaults.h"
 
 #include "login_server.h"
-#include "line_prompt.h"
 #include "account.h"
 #include "connect_server.h"
+
+#include "../util/line_prompt.h"
 
 static int prompt_verify_skey(struct account *acc, RSA_PUBLIC_KEY *key, int firsttime) {
 	uint64_t len = rsa_pubkey_bufsize(key->bits);

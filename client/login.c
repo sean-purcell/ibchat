@@ -8,7 +8,8 @@
 
 #include "login.h"
 #include "userfile.h"
-#include "line_prompt.h"
+
+#include "../util/line_prompt.h"
 
 int register_profile(char *pass, struct profile *acc);
 

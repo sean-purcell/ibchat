@@ -24,7 +24,7 @@
 #include "user_db.h"
 #include "../crypto/keyfile.h"
 #include "../inet/connect.h"
-#include "../util/getpass.h"
+#include "../util/line_prompt.h"
 #include "../util/defaults.h"
 
 /* private info */
@@ -77,7 +77,7 @@ int chat_server(int argc, char **argv) {
 	memset(&server_key, 0, sizeof(RSA_KEY));
 
 	if(opts.use_password) {
-		password = ibchat_getpass("Server password", NULL, 1);
+		password = line_prompt("Server password", NULL, 1);
 		if(password == NULL) {
 			fprintf(stderr, "failed to read password\n");
 			return 1;

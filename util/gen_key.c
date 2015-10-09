@@ -11,7 +11,7 @@
 #include <ibcrypt/rsa_util.h>
 #include <ibcrypt/zfree.h>
 
-#include "getpass.h"
+#include "line_prompt.h"
 #include "../crypto/keyfile.h"
 
 int gen_key(int argc, char **argv) {
@@ -51,7 +51,7 @@ int gen_key(int argc, char **argv) {
 
 	int ret;
 
-	password = ibchat_getpass(
+	password = line_prompt(
 		"Private key password (empty string for no pass)",
 		"Confirm password",
 		1);
