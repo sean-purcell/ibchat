@@ -13,7 +13,7 @@ client->server:
 
 server->client:
 0x00-0x07 "cliauth"
-0x07-0x08 0, 1, 2, 3
+0x07-0x08 0, 1, 2, 3, 4
 
 0:
 	logged in

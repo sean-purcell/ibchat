@@ -88,7 +88,7 @@ int get_server_authresponse(struct con_handle *ch, struct keyset *keys) {
 
 	if(authresponse->length != 8 ||
 		memcmp("cliauth", authresponse->message, 7) != 0 ||
-		(authresponse->message[7] > 3) != 0) {
+		(authresponse->message[7] > 4) != 0) {
 		fprintf(stderr, "server sent invalid authorization response\n");
 
 		free_message(authresponse);
@@ -157,7 +157,6 @@ static int prompt_verify_skey(struct account *acc, RSA_PUBLIC_KEY *key, int firs
 }
 
 int create_account(struct account *acc, struct server_connection *sc) {
-start:;
 	RSA_KEY rsa_key;
 	char *uname = NULL;
 	char *addr = NULL;
@@ -216,25 +215,7 @@ start:;
 	/* we need to connect to the server to register */
 	int ret = connect_server(addr, &(sc->ch), &(sc->server_key), &(sc->keys));
 	if(ret != 0) {
-		printf("try again? [y/n] ");
-		char *resp = line_prompt(NULL, NULL, 0);
-		if(resp == NULL) {
-			fprintf(stderr, "failed to read input\n");
-			goto err;
-		}
-
-		if((resp[0] | 32) != 'y') {
-			goto err;
-		}
-
-		if(rsa_free_prikey(&rsa_key) != 0) {
-			fprintf(stderr, "failed to free identity key\n");
-			goto err;
-		}
-		free(uname);
-		free(addr);
-		free(resp);
-		goto start;
+		goto err;
 	}
 
 	/* we need to check the key, prompt the user to verify it elsewhere */
@@ -259,7 +240,32 @@ start:;
 		goto serr;
 	}
 
-	printf("authorization response: %d\n", servresp);
+	switch(servresp) {
+	case 0:
+	case 2:
+		printf("server claims to have you already registered\n"
+			"either your random number generator is compromised\n"
+			"or the server cannot be trusted.\n"
+			"exiting.\n");
+		goto serr;
+	case 3:
+		printf("a user with that username already exists on that server.\n");
+		goto serr;
+	case 4:
+		printf("a server error occurred, could not register.\n");
+		goto serr;
+	case 1:
+		break;
+	}
+	if(servresp != 1) {
+		fprintf(stderr, "programmatic error occurred\n");
+		goto serr;
+	}
+
+	if(send_message(sc->ch, &sc->keys, (uint8_t*) "register", 8) != 0) {
+		fprintf(stderr, "failed to send registration message\n");
+		goto serr;
+	}
 
 	return 0;
 serr:
