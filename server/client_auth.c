@@ -154,7 +154,7 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 
 		/* now check the signature */
 		int valid = 0;
-		rsa_pss_verify(&pb_key, sig_bin, siglen, cli_response->message, 0x20 + keylen + 0x08, &valid);
+		rsa_pss_verify(&pb_key, sig_bin, siglen, cli_response->message, 0x20 + keylen + 0x20 + 0x08, &valid);
 
 		if(!valid) {
 			ERR("invalid signature");

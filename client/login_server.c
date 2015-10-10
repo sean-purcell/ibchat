@@ -9,13 +9,96 @@
 #include <libibur/endian.h>
 #include <libibur/util.h>
 
-#include "../util/defaults.h"
-
 #include "login_server.h"
 #include "account.h"
 #include "connect_server.h"
 
+#include "../crypto/crypto_layer.h"
 #include "../util/line_prompt.h"
+#include "../util/defaults.h"
+
+static int send_login_message(struct con_handle *ch, struct account *acc, RSA_KEY *rkey, struct keyset *keys) {
+	struct message *challenge = NULL;
+	uint8_t *resp = NULL;
+	int ret = 0;
+
+	challenge = recv_message(ch, keys, 0);
+	if(challenge == NULL) {
+		goto err;
+	}
+
+	if(challenge->length != 0x20) {
+		fprintf(stderr, "invalid challenge message from server\n");
+		goto err;
+	}
+
+	uint64_t bits = decbe64(acc->key_bin);
+
+	uint64_t size = 0;
+	size += 0x20;
+	size += rsa_pubkey_bufsize(bits);
+	size += 0x20;
+	size += 0x08;
+	size += (bits + 7) / 8;
+	resp = malloc(size);
+
+	uint8_t *uid_b, *pkey_b, *chn_b, *sigl_b, *sig_b;
+	uid_b = resp;
+	pkey_b = uid_b + 0x20;
+	chn_b = pkey_b + rsa_pubkey_bufsize(bits);
+	sigl_b = chn_b + 0x20;
+	sig_b = sigl_b + 8;
+
+	sha256((uint8_t *)acc->uname, acc->u_len + 1, uid_b);
+	if(rsa_wire_prikey2pubkey(acc->key_bin, acc->k_len, pkey_b,
+		rsa_pubkey_bufsize(bits)) != 0) {
+		goto err;
+	}
+	memcpy(chn_b, challenge->message, 0x20);
+	encbe64((bits + 7) / 8, sigl_b);
+
+	if(rsa_pss_sign(rkey, resp, sig_b - resp, sig_b, (bits + 7) / 8) != 0) {
+		fprintf(stderr, "failed to sign message\n");
+		goto err;
+	}
+
+	if(send_message(ch, keys, resp, size) != 0) {
+		fprintf(stderr, "failed to send message\n");
+		goto err;
+	}
+
+	goto cleanup;
+err:
+	ret = -1;
+cleanup:
+	if(challenge) free_message(challenge);
+	if(resp) zfree(resp, size);
+
+	return ret;
+}
+
+int get_server_authresponse(struct con_handle *ch, struct keyset *keys) {
+	struct message *authresponse = NULL;
+
+	/* wait for 5 seconds, that should be long enough */
+	authresponse = recv_message(ch, keys, 5000000ULL);
+	if(authresponse == NULL) {
+		return -1;
+	}
+
+	if(authresponse->length != 8 ||
+		memcmp("cliauth", authresponse->message, 7) != 0 ||
+		(authresponse->message[7] > 3) != 0) {
+		fprintf(stderr, "server sent invalid authorization response\n");
+
+		free_message(authresponse);
+		return -1;
+	}
+	int val = authresponse->message[7];
+
+	free_message(authresponse);
+	return val;
+}
 
 static int prompt_verify_skey(struct account *acc, RSA_PUBLIC_KEY *key, int firsttime) {
 	uint64_t len = rsa_pubkey_bufsize(key->bits);
@@ -83,6 +166,8 @@ start:;
 	rsa_key.q = BN_ZERO;
 	rsa_key.n = BN_ZERO;
 	rsa_key.d = BN_ZERO;
+
+	memset(acc, 0, sizeof(*acc));
 
 	/* initialize to zero so we can free it later without worrying */
 
@@ -153,15 +238,28 @@ start:;
 	}
 
 	/* we need to check the key, prompt the user to verify it elsewhere */
-	if(prompt_verify_skey(acc, &(sc->server_key), 1) != 0) {
+	ret = prompt_verify_skey(acc, &sc->server_key, 1);
+	if(ret != 0) {
+		if(ret == -1) {
+			fprintf(stderr, "failed to authenticate server key\n");
+		}
 		goto serr;
 	}
 
 	/* now that we're connected we need to ask to register */
-	//if(send_login_message(&(sc->ch), &(sc->keys)) != 0) {
-	//	fprintf(stderr, "failed to send login message to server\n");
-	//	return -1;
-	//}
+	if(send_login_message(sc->ch, acc, &rsa_key, &sc->keys) != 0) {
+		fprintf(stderr, "failed to send login message to server\n");
+		goto serr;
+	}
+
+	/* get the response */
+	int servresp = get_server_authresponse(sc->ch, &sc->keys);
+	if(servresp == -1) {
+		fprintf(stderr, "failed to get authorization response from server\n");
+		goto serr;
+	}
+
+	printf("authorization response: %d\n", servresp);
 
 	return 0;
 serr:
@@ -169,6 +267,8 @@ serr:
 err:
 	if(uname) free(uname);
 	if(addr) free(addr);
+	if(acc->key_bin) free(acc->key_bin);
+	rsa_free_prikey(&rsa_key);
 
 	return -1;
 }
@@ -176,6 +276,6 @@ err:
 void cleanup_server_connection(struct server_connection *sc) {
 	memsets(&(sc->keys), 0, sizeof(struct keyset));
 
-	end_handler(&(sc->ch));
+	end_handler(sc->ch);
 }
 

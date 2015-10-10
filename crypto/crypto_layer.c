@@ -81,6 +81,7 @@ struct message *recv_message(struct con_handle *con, struct keyset *keys, uint64
 
 	struct message *m_pt = alloc_message(m->length - 40);
 	if(m_pt == NULL) {
+		free_message(m);
 		return NULL;
 	}
 
@@ -92,7 +93,7 @@ struct message *recv_message(struct con_handle *con, struct keyset *keys, uint64
 
 	free_message(m);
 
-	return m;
+	return m_pt;
 }
 
 /* type: 0=client, 1=server */

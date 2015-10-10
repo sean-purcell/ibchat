@@ -9,7 +9,7 @@
 #include "account.h"
 
 struct server_connection {
-	struct con_handle ch;
+	struct con_handle *ch;
 	RSA_PUBLIC_KEY server_key;
 	struct keyset keys;
 
