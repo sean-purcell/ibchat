@@ -6,7 +6,13 @@
 #include "ibchat_client.h"
 #include "login_server.h"
 
+struct profile prof;
+struct account acc;
+struct server_connection sc;
+
 int init();
+int select_profile();
+
 int main(int argc, char **argv) {
 	/* initialize variables, etc. */
 	if(init() != 0) {
@@ -16,16 +22,20 @@ int main(int argc, char **argv) {
 
 	int ret = 0;
 
-	struct profile prof;
-	struct account acc;
-	struct server_connection sc;
-
 	/* log the user in */
 	if(login_profile(NULL, &prof) != 0) {
 		printf("failed to login\n");
 		return 1;
 	}
 
+	if(select_account() != 0) {
+		return 1;
+	}
+
+	return 0;
+}
+
+int select_profile() {
 	if((ret = pick_account(&prof, &acc)) < 0) {
 		printf("failed to pick account\n");
 		return 1;
@@ -41,5 +51,10 @@ int main(int argc, char **argv) {
 	}
 
 	return 0;
+}
+
+int handle_user() {
+	/* load list of friends, prompt to add new friends */
+	/* get unread messages from server */
 }
 

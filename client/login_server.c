@@ -262,6 +262,7 @@ int create_account(struct account *acc, struct server_connection *sc) {
 		goto serr;
 	}
 
+	printf("registering user %s at %s\n", acc->uname, acc->addr);
 	if(send_message(sc->ch, &sc->keys, (uint8_t*) "register", 8) != 0) {
 		fprintf(stderr, "failed to send registration message\n");
 		goto serr;
