@@ -21,7 +21,7 @@
 
 //#define PROTO_DEBUG
 
-#define WAIT_TIMEOUT (1000000ULL)
+#define WAIT_TIMEOUT (100000ULL)
 #define ACK_WAITTIME (5000000ULL)
 
 #define INBUF_SIZE (4096)
@@ -39,6 +39,17 @@
                 errno = ETIME; goto error;}                                    \
 }
 #endif
+
+struct con_handle {
+	int sockfd;
+	struct message_queue out_queue;
+	pthread_mutex_t out_mutex;
+	struct message_queue in_queue;
+	pthread_mutex_t in_mutex;
+	uint64_t ka_last_recv;
+	pthread_mutex_t kill_mutex;
+	int kill;
+};
 
 #define ACK_MAP_MASK 0xf
 

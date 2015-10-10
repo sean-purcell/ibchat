@@ -5,16 +5,7 @@
 
 #include "message.h"
 
-struct con_handle {
-	int sockfd;
-	struct message_queue out_queue;
-	pthread_mutex_t out_mutex;
-	struct message_queue in_queue;
-	pthread_mutex_t in_mutex;
-	uint64_t ka_last_recv;
-	pthread_mutex_t kill_mutex;
-	int kill;
-};
+struct con_handle;
 
 void *handle_connection(void *_con);
 

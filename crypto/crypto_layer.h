@@ -15,11 +15,6 @@ struct keyset {
 	uint8_t recv_hmac_key[32];
 };
 
-struct connection {
-	struct con_handle handler;
-	struct keyset     keys;
-};
-
 struct message *encrypt_message(struct keyset *keys, uint8_t *ptext, uint64_t plen);
 int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out, uint64_t outlen);
 
