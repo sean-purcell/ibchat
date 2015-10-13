@@ -130,7 +130,6 @@ int add_account(struct profile* prof, struct account *acc) {
 }
 
 int rewrite_profile(struct profile *prof) {
-	//TODO
 	prof->nonce++;
 	if(prof->nonce == 0) {
 		if(profile_reseed(prof) != 0) {
@@ -138,12 +137,34 @@ int rewrite_profile(struct profile *prof) {
 		}
 	}
 
+	if(write_userfile(prof) != 0) {
+		fprintf(stderr, "failed to write userfile\n");
+	}
+
 	return 0;
 }
 
 int profile_reseed(struct profile *prof) {
-	//TODO
-	return -1;
+	printf("your user profile has been written 2^64 times, reseeding password\n");
+	if(cs_rand(prof->salt, 32) != 0) {
+		fprintf(stderr, "failed to generate random numbers\n");
+		return 1;
+	}
+
+	uint8_t scrypt_out[96];
+	if(scrypt(prof->pass, strlen(prof->pass), prof->salt, 32,
+		1ULL << 16, 8, 1, 96, scrypt_out) != 0) {
+		fprintf(stderr, "scrypt failed to generate new keys\n");
+		return 1;
+	}
+
+	memcpy(prof->pw_check, &scrypt_out[ 0], 32);
+	memcpy(prof->symm_key, &scrypt_out[32], 32);
+	memcpy(prof->hmac_key, &scrypt_out[64], 32);
+
+	memsets(scrypt_out, 0, 96);
+
+	return 0;
 }
 
 /* data->pass should be prepopulated with a null terminated password */
