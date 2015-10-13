@@ -1,7 +1,7 @@
 #ifndef IBCHAT_CLIENT_ACCOUNT_H
 #define IBCHAT_CLIENT_ACCOUNT_H
 
-#include "login.h"
+#include "profile.h"
 
 struct account {
 	uint64_t u_len;

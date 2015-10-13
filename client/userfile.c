@@ -16,7 +16,7 @@
 
 #include "userfile.h"
 #include "account.h"
-#include "login.h"
+#include "profile.h"
 #include "uname.h"
 #include "ibchat_client.h"
 

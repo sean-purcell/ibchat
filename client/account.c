@@ -9,7 +9,7 @@
 #include <libibur/endian.h>
 
 #include "account.h"
-#include "login.h"
+#include "profile.h"
 #include "login_server.h"
 
 #include "../util/line_prompt.h"

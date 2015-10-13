@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 #include "account.h"
-#include "login.h"
+#include "profile.h"
 #include "connect_server.h"
 #include "ibchat_client.h"
 #include "login_server.h"

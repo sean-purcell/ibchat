@@ -3,7 +3,7 @@
 
 #include <ibcrypt/rsa.h>
 
-#include "login.h"
+#include "profile.h"
 
 struct profile {
 	char *pass;

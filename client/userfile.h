@@ -1,7 +1,7 @@
 #ifndef IBCHAT_CLIENT_USERFILE_H
 #define IBCHAT_CLIENT_USERFILE_H
 
-#include "login.h"
+#include "profile.h"
 
 #define UF_INV_PASS    1
 #define UF_INV_MAC     2

@@ -4,7 +4,7 @@
 #include <ibcrypt/rsa_util.h>
 
 #include "userfile.h"
-#include "login.h"
+#include "profile.h"
 
 #include "../util/getpass.h"
 #include "../util/user.h"
