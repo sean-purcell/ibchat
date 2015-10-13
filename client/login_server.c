@@ -280,6 +280,11 @@ err:
 	return -1;
 }
 
+int login_account(struct account *acc, struct server_connection *sc) {
+	//TODO this
+	return 1;
+}
+
 void cleanup_server_connection(struct server_connection *sc) {
 	memsets(&(sc->keys), 0, sizeof(struct keyset));
 

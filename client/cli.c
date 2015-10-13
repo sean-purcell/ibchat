@@ -20,15 +20,13 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	int ret = 0;
-
 	/* log the user in */
 	if(login_profile(NULL, &prof) != 0) {
-		printf("failed to login\n");
+		fprintf(stderr, "failed to login\n");
 		return 1;
 	}
 
-	if(select_account() != 0) {
+	if(select_profile() != 0) {
 		return 1;
 	}
 
@@ -36,18 +34,28 @@ int main(int argc, char **argv) {
 }
 
 int select_profile() {
+	int ret;
 	if((ret = pick_account(&prof, &acc)) < 0) {
-		printf("failed to pick account\n");
+		fprintf(stderr, "failed to pick account\n");
 		return 1;
 	}
 
 	if(ret == 0x55) { /* register a new account */
 		if(create_account(&acc, &sc) != 0) {
-			printf("failed to register account\n");
+			fprintf(stderr, "failed to register account\n");
+			return 1;
+		}
+
+		/* we should write the user file again */
+		if(add_account(&prof, &acc) != 0) {
+			fprintf(stderr, "failed to add account to user file\n");
 			return 1;
 		}
 	} else { /* login an existing account */
-		
+		if(login_account(&acc, &sc) != 0) {
+			fprintf(stderr, "failed to login account\n");
+			return 1;
+		}
 	}
 
 	return 0;
@@ -56,5 +64,6 @@ int select_profile() {
 int handle_user() {
 	/* load list of friends, prompt to add new friends */
 	/* get unread messages from server */
+	return 0;
 }
 

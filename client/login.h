@@ -18,6 +18,11 @@ struct profile {
 
 int login_profile(char *pass, struct profile *acc);
 
+int add_account(struct profile* prof, struct account *acc);
+
+int rewrite_profile(struct profile *prof);
+int profile_reseed(struct profile *prof);
+
 /* generates a random keyset */
 int gen_profile(struct profile *data);
 

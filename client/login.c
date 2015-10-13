@@ -7,6 +7,7 @@
 #include <libibur/endian.h>
 
 #include "login.h"
+#include "account.h"
 #include "userfile.h"
 
 #include "../util/line_prompt.h"
@@ -110,6 +111,38 @@ int register_profile(char *pass, struct profile *prof) {
 
 err:
 	zfree(prof->pass, strlen(prof->pass));
+	return -1;
+}
+
+int add_account(struct profile* prof, struct account *acc) {
+	struct account **cur = &prof->server_accounts;
+	while(*cur != NULL) {
+		cur = &(*cur)->next;
+	}
+
+	*cur = acc;
+
+	if(rewrite_profile(prof) != 0) {
+		return 1;
+	}
+
+	return 0;
+}
+
+int rewrite_profile(struct profile *prof) {
+	//TODO
+	prof->nonce++;
+	if(prof->nonce == 0) {
+		if(profile_reseed(prof) != 0) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int profile_reseed(struct profile *prof) {
+	//TODO
 	return -1;
 }
 
