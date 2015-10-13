@@ -274,6 +274,11 @@ int read_userfile(struct profile *user) {
 		goto err;
 	}
 
+	memcpy(user->salt, salt, 32);
+	memcpy(user->pw_check, pw_check, 32);
+	memcpy(user->symm_key, symm_key, 32);
+	memcpy(user->hmac_key, hmac_key, 32);
+
 err:
 	if(in) fclose(in);
 	memsets(scrypt_out, 0, 96);

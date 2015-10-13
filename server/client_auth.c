@@ -54,8 +54,11 @@ static int prompt_user_register(struct con_handle *con_hndl, struct keyset *keys
 	}
 
 	if(resp->length != 8 || memcmp(resp->message, "register", 8) != 0) {
+		free_message(resp);
 		return 1;
 	}
+
+	free_message(resp);
 
 	return 0;
 }
@@ -79,7 +82,7 @@ static int user_register(uint8_t *uid, RSA_PUBLIC_KEY *pkey, int fd, struct con_
 	char uname[65];
 	to_hex(uid, 32, uname);
 	uname[64] = '\0';
-	fprintf(stderr, "%d: registered user %s\n", fd, uname);
+	printf("%d: registered user %s\n", fd, uname);
 	return 0;
 }
 
