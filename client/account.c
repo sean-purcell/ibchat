@@ -34,7 +34,7 @@ int pick_account(struct profile *prof, struct account *acc) {
 	uint64_t idx = 1;
 	struct account *acc_list = prof->server_accounts;
 
-	printf("select an account:");
+	printf("select an account:\n");
 	printf("%4d: create a new account\n", 0);
 
 	while(acc_list) {
@@ -43,7 +43,7 @@ int pick_account(struct profile *prof, struct account *acc) {
 		acc_list = acc_list->next;
 	}
 
-	uint64_t selection = num_prompt("selection: ", 0, idx);
+	uint64_t selection = num_prompt("selection", 0, idx);
 
 	if(selection == ULLONG_MAX) {
 		perror("failed to read response");
