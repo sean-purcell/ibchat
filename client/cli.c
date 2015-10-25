@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <unistd.h>
 
 #include "account.h"
 #include "profile.h"
@@ -29,6 +30,8 @@ int main(int argc, char **argv) {
 	if(select_profile() != 0) {
 		return 1;
 	}
+
+	sleep(5);
 
 	return 0;
 }

@@ -69,12 +69,14 @@ static int user_register(uint8_t *uid, RSA_PUBLIC_KEY *pkey, int fd, struct con_
 		return ret;
 	}
 
+	printf("INITIALIZING USER\n");
 	/* add them to the user database */
 	struct user u;
 	if(user_init(uid, *pkey, &u) != 0) {
 		return -1;
 	}
 
+	printf("ADDING TO USER DATABASE\n");
 	if(user_db_add(u) != 0) {
 		return -1;
 	}
@@ -167,10 +169,13 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 		memcpy(uid, cli_response->message, 0x20);
 	}
 
+	printf("CHECKING USER\n");
 	/* now we have a uid and public key, identify this user */
 	int ret = check_user(uid, &pb_key);
+	printf("USER CHECKED\n");
 
-	char msg[8] = "cliauth";
+	char msg[8];
+	memcpy(msg, "cliauth", 7);
 	msg[7] = ret;
 
 	if(send_message(con_hndl, keys, (uint8_t *) msg, 8) != 0) {
@@ -187,6 +192,7 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 	}
 
 	if(ret == 1) {
+		printf("REGISTERING USER\n");
 		ret = user_register(uid, &pb_key, cli_hndl->fd, con_hndl, keys);
 		if(ret != 0) {
 			if(ret == -1) {
@@ -194,6 +200,7 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 			}
 			goto err3;
 		}
+		printf("USER REGISTERED\n");
 	}
 
 	memset(challenge, 0, sizeof(challenge));

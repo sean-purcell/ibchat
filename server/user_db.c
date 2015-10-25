@@ -203,7 +203,7 @@ static int parse_user_file(char *name, struct user *user) {
 	READ(uf, uid, 0x20);
 
 	/* check the uid against the expected one */
-	from_hex(name, expected_uid);
+	from_hex(&name[strlen(name)-64], expected_uid);
 
 	/* it is conceivable that someone has read permissions for the
 	 * directory but not for the file, however this is likely being
@@ -298,6 +298,7 @@ static int write_user_file(struct user *u) {
 	name[64] = '\0';
 	to_hex(u->uid, 0x20, name);
 
+	printf("%d\n", __LINE__);
 	size_t upathlen = strlen(USER_DIR);
 	char *path = malloc(upathlen + 64 + 1);
 	if(path == NULL) {
@@ -307,9 +308,11 @@ static int write_user_file(struct user *u) {
 
 	path[upathlen + 64] = '\0';
 
+	printf("%d\n", __LINE__);
 	strcpy(path, USER_DIR);
 	to_hex(u->uid, 0x20, path + upathlen);
 
+	printf("%s\n", path);
 	FILE *uf = fopen(path, "wb");
 	if(uf == NULL) {
 		fprintf(stderr, "failed to open user file: %s\n", name);
@@ -344,21 +347,29 @@ static int write_user_file(struct user *u) {
 	uint8_t *pkey = sig1 + sigsize;
 	uint8_t *sig2 = pkey + rsa_pubkey_bufsize(u->pkey.bits);
 
+	printf("%d\n", __LINE__);
 	memcpy(magic, USER_FILE_MAGIC, 8);
+	printf("%d\n", __LINE__);
 	memcpy(uid, u->uid, 0x20);
+	printf("%d\n", __LINE__);
 	memcpy(undelivered, u->undel, 0x20);
+	printf("%d\n", __LINE__);
 	encbe64(rsa_pubkey_bufsize(u->pkey.bits), sizebuf);
 
+	printf("%d\n", __LINE__);
 	if(rsa_pss_sign(&server_key, buf, sig1 - buf, sig1, sigsize) != 0) {
 		ERR();
 	}
 
+	printf("%d\n", __LINE__);
 	rsa_pubkey2wire(&u->pkey, pkey, rsa_pubkey_bufsize(u->pkey.bits));
 
+	printf("%d\n", __LINE__);
 	if(rsa_pss_sign(&server_key, buf, sig2 - buf, sig2, sigsize) != 0) {
 		ERR();
 	}
 
+	printf("%d\n", __LINE__);
 	WRITE(uf, buf, bufsize);
 
 	int ret = 0;
@@ -395,6 +406,7 @@ static int load_user_files() {
 		fprintf(stderr, "failed to allocate memory\n");
 		return 1;
 	}
+	memcpy(path, USER_DIR, upathlen);
 	path[upathlen + 64] = '\0';
 
 	struct dirent *ent;
@@ -519,6 +531,7 @@ int user_db_add(struct user u) {
 	int ret = 0;
 
 	/* check if the user exists first */
+	printf("%d\n", __LINE__);
 	if(user_db_get_nolock(u.uid) != NULL) {
 		char name[64];
 		to_hex(u.uid, 0x20, name);
@@ -528,6 +541,7 @@ int user_db_add(struct user u) {
 	}
 
 	/* create a user file */
+	printf("%d\n", __LINE__);
 	if(write_user_file(&u) != 0) {
 		fprintf(stderr, "failed to write user file\n");
 		ret = 1;
@@ -535,6 +549,7 @@ int user_db_add(struct user u) {
 	}
 
 	/* add it to the table */
+	printf("%d\n", __LINE__);
 	if(user_db_add_no_write(u) != 0) {
 		fprintf(stderr, "failed to add user struct to database\n");
 		ret = 1;
@@ -580,6 +595,7 @@ static int gen_undel_file(uint8_t *id) {
 int user_init(uint8_t *uid, RSA_PUBLIC_KEY pkey, struct user *u) {
 	memcpy(u->uid, uid, 0x20);
 
+	printf("GENERATING UNDEL FILE\n");
 	if(gen_undel_file(u->undel) != 0) {
 		return 1;
 	}
@@ -587,6 +603,9 @@ int user_init(uint8_t *uid, RSA_PUBLIC_KEY pkey, struct user *u) {
 	u->pkey.e = pkey.e;
 	u->pkey.bits = pkey.bits;
 
+	u->pkey.n = BN_ZERO;
+	printf("COPYING PUBLIC KEY\n");
+	printf("%llx %llx\n", (unsigned long long) pkey.n.size, (unsigned long long) pkey.n.d);
 	if(bni_cpy(&u->pkey.n, &pkey.n) != 0) {
 		return 1;
 	}
