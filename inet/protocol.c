@@ -22,7 +22,8 @@
 //#define PROTO_DEBUG
 
 #define WAIT_TIMEOUT (100000ULL)
-#define ACK_WAITTIME (5000000ULL)
+#define ACK_WAITTIME (10000000ULL)
+#define READWRITE_WAIT (5000000ULL)
 
 #define INBUF_SIZE (4096)
 
@@ -359,7 +360,7 @@ static int write_messages(struct con_handle *con, struct ack_map *map) {
 	while(con->out_queue.size > 0 && utime(tv) - start < ACK_WAITTIME / 2) {
 		struct message *next_message = message_queue_top(&con->out_queue);
 
-		const uint64_t total_time = 1000000ULL;
+		const uint64_t total_time = READWRITE_WAIT;
 		uint64_t end = utime(tv) + total_time;
 
 		/* calculate sha256 hash */
@@ -397,11 +398,10 @@ static int write_messages(struct con_handle *con, struct ack_map *map) {
 		}
 
 		message_queue_pop(&con->out_queue);
-		free_message(next_message);
-
 #ifdef PROTO_DEBUG
 		printf("%llu sent\n", next_message->seq_num);
 #endif
+		free_message(next_message);
 		gettimeofday(&tv, NULL);
 	}
 
@@ -421,7 +421,7 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 	struct message *in_message;
 	uint64_t seq_num, length;
 
-	const uint64_t total_time = 1000000ULL;
+	const uint64_t total_time = READWRITE_WAIT;
 	uint64_t end;
 	struct timeval now;
 

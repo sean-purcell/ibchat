@@ -568,7 +568,7 @@ static int gen_undel_file(uint8_t *id) {
 	}
 
 	/* check if the file already exists, in which case our rng is broken */
-	size_t pathlen = sizeof(USER_DIR) + 64 + 1;
+	size_t pathlen = strlen(USER_DIR) + 64 + 1;
 	char *path = malloc(pathlen);
 	if(path == NULL) {
 		fprintf(stderr, "failed to allocate memory\n");

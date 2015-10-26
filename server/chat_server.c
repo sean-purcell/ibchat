@@ -208,6 +208,7 @@ int process_opts(int argc, char **argv) {
 	/* expand the root dir */
 	{ 
 		wordexp_t expanded;
+		memset(&expanded, 0, sizeof(expanded));
 		if(wordexp(opts.root_dir, &expanded, WRDE_UNDEF) != 0) {
 			fprintf(stderr, "failed to expand root dir\n");
 			return 1;
