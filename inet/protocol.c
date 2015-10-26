@@ -47,6 +47,7 @@ struct con_handle {
 	pthread_mutex_t out_mutex;
 	struct message_queue in_queue;
 	pthread_mutex_t in_mutex;
+	pthread_cond_t in_cond;
 	uint64_t ka_last_recv;
 	pthread_mutex_t kill_mutex;
 	int kill;
@@ -95,6 +96,7 @@ void init_handler(struct con_handle *con, int sockfd) {
 	pthread_mutex_init(&con->out_mutex, NULL);
 	pthread_mutex_init(&con->in_mutex, NULL);
 	pthread_mutex_init(&con->kill_mutex, NULL);
+	pthread_cond_init(&con->in_cond, NULL);
 	con->ka_last_recv = 0;
 	con->kill = 0;
 }
@@ -142,6 +144,7 @@ void destroy_handler(struct con_handle *con) {
 	pthread_mutex_destroy(&con->out_mutex);
 	pthread_mutex_destroy(&con->in_mutex);
 	pthread_mutex_destroy(&con->kill_mutex);
+	pthread_cond_destroy(&con->in_cond);
 
 	free(con);
 }
@@ -150,11 +153,15 @@ struct message *get_message(struct con_handle *con, uint64_t timeout) {
 	struct timeval start, now;
 	gettimeofday(&start, NULL);
 	now = start;
-	uint64_t waittime = timeout < WAIT_TIMEOUT ? timeout : WAIT_TIMEOUT;
 	struct message *m = NULL;
+	struct timespec wait;
+	wait.tv_sec = 0;
+	wait.tv_nsec = (long long) (timeout != 0 && timeout < WAIT_TIMEOUT ?
+		timeout : WAIT_TIMEOUT);
 	while(handler_status(con) == 0 &&
 		(timeout == 0 || utime(now) - utime(start) < timeout)) {
 		pthread_mutex_lock(&con->in_mutex);
+		pthread_cond_timedwait(&con->in_cond, &con->in_mutex, &wait);
 		if(con->in_queue.size > 0) {
 			m = message_queue_pop(&con->in_queue);
 
@@ -162,7 +169,6 @@ struct message *get_message(struct con_handle *con, uint64_t timeout) {
 			goto exit;
 		}
 		pthread_mutex_unlock(&con->in_mutex);
-		usleep(waittime);
 
 		gettimeofday(&now, NULL);
 	}
@@ -491,6 +497,7 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 		if(message_queue_push(&con->in_queue, in_message) == -1) {
 			goto error;
 		}
+		pthread_cond_broadcast(&con->in_cond);
 
 		if(write_acknowledge(con, in_message->seq_num) == -1) {
 			goto error;
