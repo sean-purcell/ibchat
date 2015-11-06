@@ -111,6 +111,10 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 		return -1;
 	}
 
+#ifdef HANDSHAKE_DEBUG
+	printf("received client message\n");
+#endif
+
 	/* expand the response */
 	if(dh_wire2val(client_m->message, client_m->length, &dh_client_key) != 0) {
 		HS_TRACE();

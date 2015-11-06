@@ -21,9 +21,9 @@
 
 //#define PROTO_DEBUG
 
-#define WAIT_TIMEOUT (100000ULL)
-#define ACK_WAITTIME (10000000ULL)
-#define READWRITE_WAIT (5000000ULL)
+#define WAIT_TIMEOUT (10000000ULL)
+#define ACK_WAITTIME (100000000ULL)
+#define READWRITE_WAIT (1000000ULL)
 
 #define INBUF_SIZE (4096)
 
@@ -44,12 +44,13 @@
 struct con_handle {
 	int sockfd;
 	struct message_queue out_queue;
-	pthread_mutex_t out_mutex;
+	pthread_mutex_t out_mutex; /* mutex protecting the outgoing queue */
 	struct message_queue in_queue;
-	pthread_mutex_t in_mutex;
-	pthread_cond_t in_cond;
-	uint64_t ka_last_recv;
-	pthread_mutex_t kill_mutex;
+	pthread_mutex_t in_mutex; /* mutex protecting the incoming queue */
+	pthread_cond_t in_cond; /* condition variable to signal new message */
+	int out_cond[2]; /* outgoing signal to indicate new message to send */
+	uint64_t ka_last_recv; /* last time a keep-alive was received */
+	pthread_mutex_t kill_mutex; /* mutex protecting the kill flag */
 	int kill;
 };
 
@@ -97,6 +98,7 @@ void init_handler(struct con_handle *con, int sockfd) {
 	pthread_mutex_init(&con->in_mutex, NULL);
 	pthread_mutex_init(&con->kill_mutex, NULL);
 	pthread_cond_init(&con->in_cond, NULL);
+	pipe(con->out_cond);
 	con->ka_last_recv = 0;
 	con->kill = 0;
 }
@@ -145,6 +147,8 @@ void destroy_handler(struct con_handle *con) {
 	pthread_mutex_destroy(&con->in_mutex);
 	pthread_mutex_destroy(&con->kill_mutex);
 	pthread_cond_destroy(&con->in_cond);
+	close(con->out_cond[0]);
+	close(con->out_cond[1]);
 
 	free(con);
 }
@@ -154,20 +158,30 @@ struct message *get_message(struct con_handle *con, uint64_t timeout) {
 	gettimeofday(&start, NULL);
 	now = start;
 	struct message *m = NULL;
+	long waittime = (long long) (timeout != 0 && timeout < WAIT_TIMEOUT ?
+		timeout : WAIT_TIMEOUT) * 1000;
 	struct timespec wait;
-	wait.tv_sec = 0;
-	wait.tv_nsec = (long long) (timeout != 0 && timeout < WAIT_TIMEOUT ?
-		timeout : WAIT_TIMEOUT);
 	while(handler_status(con) == 0 &&
 		(timeout == 0 || utime(now) - utime(start) < timeout)) {
 		pthread_mutex_lock(&con->in_mutex);
-		pthread_cond_timedwait(&con->in_cond, &con->in_mutex, &wait);
 		if(con->in_queue.size > 0) {
 			m = message_queue_pop(&con->in_queue);
 
 			pthread_mutex_unlock(&con->in_mutex);
 			goto exit;
 		}
+
+		wait.tv_sec = now.tv_sec;
+		wait.tv_nsec = (long long) now.tv_usec * 1000 + waittime;
+		wait.tv_sec += wait.tv_nsec / 1000000000LL;
+		wait.tv_nsec %= 1000000000LL;
+#ifdef PROTO_DEBUG
+		printf("%d: entering wait\n", con->sockfd);
+#endif
+		pthread_cond_timedwait(&con->in_cond, &con->in_mutex, &wait);
+#ifdef PROTO_DEBUG
+		printf("%d: exiting wait\n", con->sockfd);
+#endif
 		pthread_mutex_unlock(&con->in_mutex);
 
 		gettimeofday(&now, NULL);
@@ -193,6 +207,17 @@ exit:
 void add_message(struct con_handle *con, struct message *m) {
 	pthread_mutex_lock(&con->out_mutex);
 	message_queue_push(&con->out_queue, m);
+
+	char c = '\0';
+	while(write(con->out_cond[1], &c, 1) != 1) {
+		if(errno != EINTR) break;
+		/* that shouldn't happen but we can't risk an infinite loop */
+	}
+
+#ifdef PROTO_DEBUG
+	printf("%d: wrote message and write flag\n", con->sockfd);
+#endif
+
 	pthread_mutex_unlock(&con->out_mutex);
 }
 
@@ -212,7 +237,6 @@ void *handle_connection(void *_con) {
 	struct ack_map map;
 
 	fd_set rset;
-	fd_set wset;
 	struct timeval select_wait;
 	struct timeval now;
 
@@ -231,12 +255,11 @@ void *handle_connection(void *_con) {
 
 	while(1) {
 		FD_ZERO(&rset);
-		FD_ZERO(&wset);
 		FD_SET(con->sockfd, &rset);
-		FD_SET(con->sockfd, &wset);
+		FD_SET(con->out_cond[0], &rset);
 		select_wait = tvtime(WAIT_TIMEOUT);
 
-		if(select(FD_SETSIZE, &rset, &wset, NULL, &select_wait) == -1) {
+		if(select(FD_SETSIZE, &rset, NULL, NULL, &select_wait) == -1) {
 #ifdef PROTO_DEBUG
 			fprintf(stderr, "%d: select error: %s\n", __LINE__,
 				strerror(errno));
@@ -270,7 +293,22 @@ void *handle_connection(void *_con) {
 		}
 		endread:;
 
-		if(FD_ISSET(con->sockfd, &wset)) {
+		if(FD_ISSET(con->out_cond[0], &rset)) {
+#ifdef PROTO_DEBUG
+			printf("%d: out_cond flag set\n", con->sockfd);
+#endif
+			char c;
+			while(read(con->out_cond[0], &c, 1) != 1) {
+				if(errno != EINTR) break;
+				/* should not happen */
+			}
+#ifdef NOTDEFED
+		}
+		/* we can't rely on the out_cond being set when a message is
+		 * to be sent because write could have failed on the other end
+		 */
+		{
+#endif
 			ret = pthread_mutex_trylock(&con->out_mutex);
 			if(ret != 0) {
 				if(ret != EBUSY) {

@@ -148,7 +148,7 @@ int handle_connections(int server_socket) {
 		FD_ZERO(&rd_set);
 		FD_SET(server_socket, &rd_set);
 		timeout.tv_sec = 0;
-		timeout.tv_usec = 1000;
+		timeout.tv_usec = 100000ULL;
 
 		if(select(FD_SETSIZE, &rd_set, NULL, NULL, &timeout) == -1) {
 			if(errno == EINTR) {
