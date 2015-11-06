@@ -24,6 +24,8 @@
 
 #include "../util/lock.h"
 
+#define USER_DB_DEBUG
+
 #define TOP_LOAD (0.75)
 #define BOT_LOAD (0.5 / 2)
 
@@ -165,8 +167,13 @@ static int check_user_dir() {
 }
 
 static int parse_user_file(char *name, struct user *user) {
+#ifdef USER_DB_DEBUG
+#define ERR() do { fprintf(stderr, "invalid user file: %s, line no: %d\n", name, __LINE__);\
+	goto err; } while(0);
+#else
 #define ERR() do { fprintf(stderr, "invalid user file: %s\n", name);\
 	goto err; } while(0);
+#endif
 #define READ(f, b, s)                                                          \
         if(fread(b, s, 1, f) != 1) {                                           \
                 ERR();                                                         \
@@ -244,7 +251,7 @@ static int parse_user_file(char *name, struct user *user) {
 	uint8_t *pkey_buf = buf + 0x50 + siglen;
 
 	/* read in the public key */
-	READ(uf, buf, pkey_size);
+	READ(uf, &buf[0x50 + siglen], pkey_size);
 
 	/* copy the other data into the buffer */
 	memcpy(buf, prefix, 0x50);

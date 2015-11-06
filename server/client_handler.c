@@ -112,6 +112,9 @@ struct ch_manager {
 void ch_cleanup_end_handler(void *_arg) {
 	struct ch_manager *arg = (struct ch_manager *)_arg;
 
+	/* give them a chance to receive any left over messages */
+	sleep(5);
+
 	end_handler(arg->handler);
 	pthread_join(arg->thread, NULL);
 }
@@ -151,8 +154,7 @@ void *client_handler(void *_arg) {
 		goto err3;
 	}
 
-	/* thats it for now, sleep for a bit and then exit */
-	sleep(5);
+	/* thats it for now */
 
 	memset(&keys, 0, sizeof(struct keyset));
 err3:
