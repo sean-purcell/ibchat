@@ -169,10 +169,8 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 		memcpy(uid, cli_response->message, 0x20);
 	}
 
-	printf("CHECKING USER\n");
 	/* now we have a uid and public key, identify this user */
 	int ret = check_user(uid, &pb_key);
-	printf("USER CHECKED\n");
 
 	char msg[8];
 	memcpy(msg, "cliauth", 7);

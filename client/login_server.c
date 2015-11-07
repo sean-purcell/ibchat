@@ -136,7 +136,8 @@ static int prompt_verify_skey(struct account *acc, RSA_PUBLIC_KEY *key, int firs
 		ohexhash[64] = '\0';
 		printf("server at %s provided public key with fingerprint:\n"
 		"%s\n"
-		"this does not match the previous fingerprint of %s\n"
+		"this does not match the previous fingerprint of:\n"
+		"%s\n"
 		"you should check this fingerprint against a separate trustworthy source\n"
 		"trust this key? [y/n] ",
 		acc->addr, hexhash, ohexhash);
@@ -150,9 +151,9 @@ static int prompt_verify_skey(struct account *acc, RSA_PUBLIC_KEY *key, int firs
 
 	if(resp[0] == 'y') {
 		memcpy(acc->sfing, hash, 32);
-		return 0;
+		return firsttime ? 0 : 1;
 	} else {
-		return 1;
+		return -1;
 	}
 }
 
@@ -281,7 +282,86 @@ err:
 }
 
 int login_account(struct account *acc, struct server_connection *sc) {
-	//TODO this
+	RSA_KEY rsa_key;
+	if(rsa_wire2prikey(acc->key_bin, acc->k_len, &rsa_key) != 0) {
+		fprintf(stderr, "failed to expand identity key\n");
+		return 1;
+	}
+
+	/* we need to connect to the server to register */
+	int ret = connect_server(acc->addr, &(sc->ch), &(sc->server_key), &(sc->keys));
+	if(ret != 0) {
+		goto err;
+	}
+
+	/* we need to check the key, prompt the user to verify it elsewhere */
+	ret = prompt_verify_skey(acc, &sc->server_key, 0);
+	if(ret != 0) {
+		if(ret == -1) {
+			fprintf(stderr, "failed to authenticate server key\n");
+			goto serr;
+		}
+		if(ret == 1) {
+			printf("saving new server key fingerprint\n");
+			userfile_dirty = 1;
+		}
+	}
+
+	/* now that we're connected we need to ask to register */
+	if(send_login_message(sc->ch, acc, &rsa_key, &sc->keys) != 0) {
+		fprintf(stderr, "failed to send login message to server\n");
+		goto serr;
+	}
+
+	/* get the response */
+	int servresp = get_server_authresponse(sc->ch, &sc->keys);
+	if(servresp == -1) {
+		fprintf(stderr, "failed to get authorization response from server\n");
+		goto serr;
+	}
+
+	switch(servresp) {
+	case 0:
+		break;
+	case 1:
+		printf("the server does not have your account registered.\n"
+		       "would you like to register? [y/n] ");
+		break;
+	case 2:
+		printf("your account is already logged in to this server.\n"
+		       "the other instance must be logged out before you can log in.\n");
+		goto serr;
+	case 3:
+		printf("there is a different user registered under this name on this server.\n"
+		       "if you believe this is an error, contact the server administrator.\n");
+		goto serr;
+	case 4:
+		printf("a server error occurred, could not login.\n");
+		goto serr;
+	}
+	if(servresp != 1 && servresp != 0) {
+		fprintf(stderr, "programmatic error occurred\n");
+		goto serr;
+	}
+	if(servresp == 1) {
+		printf("registering user %s at %s\n", acc->uname, acc->addr);
+
+		if(send_message(sc->ch, &sc->keys, (uint8_t*) "register", 8) != 0) {
+			fprintf(stderr, "failed to send registration message\n");
+			goto serr;
+		}
+	}
+
+	printf("user %s logged in to %s\n", acc->uname, acc->addr);
+
+	return 0;
+serr:
+	cleanup_server_connection(sc);
+err:
+	rsa_free_prikey(&rsa_key);
+
+	return -1;
+	//TODO this -- note to self: leave better comments in the future
 	return 1;
 }
 
