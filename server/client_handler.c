@@ -119,6 +119,15 @@ void ch_cleanup_end_handler(void *_arg) {
 	pthread_join(arg->thread, NULL);
 }
 
+void keys_cleanup_end_handler(void *keys) {
+	memsets(keys, 0, sizeof(struct keyset));
+}
+
+void ht_cleanup_end_handler(void *_arg) {
+	struct client_handler *arg = (struct client_handler) _arg;
+	rem_handler(arg->id);
+}
+
 void *client_handler(void *_arg) {
 	struct client_handler c_hndl;
 	struct ch_manager c_mgr;
@@ -148,17 +157,28 @@ void *client_handler(void *_arg) {
 		goto err3;
 	}
 	printf("%d: successfully completed handshake\n", fd);
+	pthread_cleanup_push(keys_cleanup_end_handler, &keys);
 
 	/* now we can start communicating with this user */
 	if(auth_user(&c_hndl, c_mgr.handler, &keys, c_hndl.id) != 0) {
+		fprintf(stderr, "%d: failed to authorize user\n", fd);
 		goto err3;
 	}
 
-	/* thats it for now */
+	/* insert them into the user table */
+	if(add_handler(&c_hndl) != 0) {
+		fprintf(stderr, "%d: failed to add to the handler table\n", fd);
+		goto err3;
+	}
+	pthread_cleanup_push(ht_cleanup_end_handler, &c_hndl);
 
-	memset(&keys, 0, sizeof(struct keyset));
-err3:
+
+	/* thats it for now */
+err4:
 	pthread_cleanup_pop(1);
+err3:
+	pthread_cleanup_pop(1); /* zero the keys */
+	pthread_cleanup_pop(1); /* end the connection handler */
 err2:
 	destroy_client_handler(&c_hndl);
 err1:

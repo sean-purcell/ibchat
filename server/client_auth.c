@@ -190,7 +190,6 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 	}
 
 	if(ret == 1) {
-		printf("REGISTERING USER\n");
 		ret = user_register(uid, &pb_key, cli_hndl->fd, con_hndl, keys);
 		if(ret != 0) {
 			if(ret == -1) {
@@ -198,7 +197,9 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 			}
 			goto err3;
 		}
-		printf("USER REGISTERED\n");
+		char buf[65];
+		to_hex(uid, 32, buf);
+		printf("%d: registered user %s\n", buf);
 	}
 
 	memset(challenge, 0, sizeof(challenge));
