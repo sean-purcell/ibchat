@@ -199,7 +199,7 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 		}
 		char buf[65];
 		to_hex(uid, 32, buf);
-		printf("%d: registered user %s\n", buf);
+		printf("%d: registered user %s\n", cli_hndl->fd, buf);
 	}
 
 	memset(challenge, 0, sizeof(challenge));

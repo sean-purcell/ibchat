@@ -170,7 +170,7 @@ int handle_connections(int server_socket) {
 		}
 	}
 
-	
+	end_handlers();
 
 	return 0;
 err:

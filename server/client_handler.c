@@ -8,6 +8,7 @@
 
 #include <ibcrypt/rand.h>
 #include <ibcrypt/sha256.h>
+#include <ibcrypt/zfree.h>
 
 #include <libibur/endian.h>
 
@@ -25,6 +26,15 @@ struct handler_arg {
 	pthread_t thread;
 	int fd;
 };
+
+struct handler_table {
+	struct client_handler **buckets;
+	uint64_t size; /* doubles as the modulus */
+
+	uint64_t elements;
+
+	struct lock l;
+} ht;
 
 void *client_handler(void *_arg);
 
@@ -60,6 +70,8 @@ static int init_client_handler(void *_arg, struct client_handler *handler) {
 		return -1;
 	}
 	handler->send_queue = EMPTY_MESSAGE_QUEUE;
+
+	handler->stop = 0;
 
 	/* free the argument */
 	free(arg);
@@ -124,9 +136,16 @@ void keys_cleanup_end_handler(void *keys) {
 }
 
 void ht_cleanup_end_handler(void *_arg) {
-	struct client_handler *arg = (struct client_handler) _arg;
+	struct client_handler *arg = (struct client_handler *) _arg;
 	rem_handler(arg->id);
+
+	if(arg->stop && ht.elements == 0) {
+		destroy_handler_table();
+	}
 }
+
+int client_handle_loop(struct client_handler *c_hndl,
+	struct ch_manager *c_mgr, struct keyset *keys);
 
 void *client_handler(void *_arg) {
 	struct client_handler c_hndl;
@@ -162,28 +181,60 @@ void *client_handler(void *_arg) {
 	/* now we can start communicating with this user */
 	if(auth_user(&c_hndl, c_mgr.handler, &keys, c_hndl.id) != 0) {
 		fprintf(stderr, "%d: failed to authorize user\n", fd);
-		goto err3;
+		goto err4;
 	}
+
+	c_hndl.hndl = c_mgr.handler;
+	c_hndl.keys = &keys;
 
 	/* insert them into the user table */
 	if(add_handler(&c_hndl) != 0) {
 		fprintf(stderr, "%d: failed to add to the handler table\n", fd);
-		goto err3;
+		goto err4;
 	}
 	pthread_cleanup_push(ht_cleanup_end_handler, &c_hndl);
 
+	/* TODO: implement undelivered */
+	//if(send_undelivered(c_hndl.id, c_mgr.handler, &keys) != 0) {
+	//	fprintf(stderr, "%d: failed to send undelivered messages\n", fd);
+		/* this is an acceptable error
+		 * we can continue to interact with the user */
+	//}
+
+	if(client_handle_loop(&c_hndl, &c_mgr, &keys) != 0) {
+		goto err5;
+	}
 
 	/* thats it for now */
-err4:
+err5:
 	pthread_cleanup_pop(1);
-err3:
+err4:
 	pthread_cleanup_pop(1); /* zero the keys */
+err3:
 	pthread_cleanup_pop(1); /* end the connection handler */
 err2:
 	destroy_client_handler(&c_hndl);
 err1:
 	printf("%d: exiting\n", fd);
 	return NULL;
+}
+
+
+int client_handle_loop(struct client_handler *c_hndl,
+	struct ch_manager *c_mgr, struct keyset *keys) {
+
+	/* while the connection is alive */
+	while(handler_status(c_mgr->handler) == 0 && c_hndl->stop == 0) {
+		struct message *m = recv_message(c_hndl, keys, 1000000ULL);
+
+		handle_message(m, c_hndl);
+	}
+
+	return 0;
+}
+
+int handle_message(struct message *m, struct client_handler *c_hndl) {
+	
 }
 
 /* handler table data structure */
@@ -194,15 +245,6 @@ err1:
 
 #define MAX_SIZE ((uint64_t)1 << 20)
 #define MIN_SIZE ((uint64_t) 16)
-
-struct handler_table {
-	struct client_handler **buckets;
-	uint64_t size; /* doubles as the modulus */
-
-	uint64_t elements;
-
-	struct lock l;
-} ht;
 
 static uint64_t hash_id(uint8_t *id) {
 	uint8_t shasum[32];
@@ -265,6 +307,21 @@ int init_handler_table() {
 	}
 
 	return 0;
+}
+
+void end_handlers() {
+	acquire_writelock(&ht.l);
+
+	uint64_t i;
+	for(i = 0; i < ht.size; i++) {
+		struct client_handler *cur = ht.buckets[i];
+
+		while(cur) {
+			cur->stop = 1;
+			cur = cur->next;
+		}
+	}
+	release_readlock(&ht.l);
 }
 
 void destroy_handler_table() {
