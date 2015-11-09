@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <ibcrypt/rsa_util.h>
 #include <ibcrypt/rand.h>
 #include <ibcrypt/sha256.h>
 #include <ibcrypt/zfree.h>
@@ -15,6 +16,8 @@
 #include "client_handler.h"
 #include "chat_server.h"
 #include "client_auth.h"
+#include "user_db.h"
+#include "undelivered.h"
 
 #include "../crypto/crypto_layer.h"
 #include "../crypto/handshake.h"
@@ -36,7 +39,17 @@ struct handler_table {
 	struct lock l;
 } ht;
 
+/* client handler cleanup */
+struct ch_manager {
+	struct con_handle *handler;
+	pthread_t thread;
+};
+
 void *client_handler(void *_arg);
+static int client_handle_loop(struct client_handler *c_hndl,
+	struct ch_manager *c_mgr, struct keyset *keys);
+static int handle_message(struct message *m, struct client_handler *c_hndl);
+static int send_u_notfound(struct client_handler *c_hndl, uint8_t *id);
 
 int spawn_handler(int fd) {
 	struct handler_arg *arg = malloc(sizeof(*arg));
@@ -64,12 +77,6 @@ static int init_client_handler(void *_arg, struct client_handler *handler) {
 
 	handler->fd = arg->fd;
 	handler->thread = arg->thread;
-
-	/* initialize the send queue and send mutex */
-	if(pthread_mutex_init(&handler->send_mutex, NULL) != 0) {
-		return -1;
-	}
-	handler->send_queue = EMPTY_MESSAGE_QUEUE;
 
 	handler->stop = 0;
 
@@ -111,16 +118,6 @@ static int client_handler_handshake(struct con_handle *con, struct keyset *keys)
 	return ret;
 }
 
-static void destroy_client_handler(struct client_handler *handler) {
-	pthread_mutex_destroy(&handler->send_mutex);
-}
-
-/* client handler cleanup */
-struct ch_manager {
-	struct con_handle *handler;
-	pthread_t thread;
-};
-
 void ch_cleanup_end_handler(void *_arg) {
 	struct ch_manager *arg = (struct ch_manager *)_arg;
 
@@ -143,9 +140,6 @@ void ht_cleanup_end_handler(void *_arg) {
 		destroy_handler_table();
 	}
 }
-
-int client_handle_loop(struct client_handler *c_hndl,
-	struct ch_manager *c_mgr, struct keyset *keys);
 
 void *client_handler(void *_arg) {
 	struct client_handler c_hndl;
@@ -207,34 +201,155 @@ void *client_handler(void *_arg) {
 
 	/* thats it for now */
 err5:
-	pthread_cleanup_pop(1);
+	pthread_cleanup_pop(1); /* remove from the handler table */
 err4:
 	pthread_cleanup_pop(1); /* zero the keys */
 err3:
 	pthread_cleanup_pop(1); /* end the connection handler */
 err2:
-	destroy_client_handler(&c_hndl);
 err1:
 	printf("%d: exiting\n", fd);
 	return NULL;
 }
 
 
-int client_handle_loop(struct client_handler *c_hndl,
+static int client_handle_loop(struct client_handler *c_hndl,
 	struct ch_manager *c_mgr, struct keyset *keys) {
 
 	/* while the connection is alive */
 	while(handler_status(c_mgr->handler) == 0 && c_hndl->stop == 0) {
-		struct message *m = recv_message(c_hndl, keys, 1000000ULL);
+		struct message *m = recv_message(c_hndl->hndl, keys, 1000000ULL);
 
 		handle_message(m, c_hndl);
+		free_message(m);
 	}
 
 	return 0;
 }
 
-int handle_message(struct message *m, struct client_handler *c_hndl) {
-	
+static int handle_message(struct message *m, struct client_handler *c_hndl) {
+	if(m->length < 33) {
+		return -1;
+	}
+
+	uint8_t uid[32];
+	memcpy(uid, &m->message[1], 32);
+
+	switch(m->message[0]) {
+	case 0: {
+		struct user *u = user_db_get(uid);
+		if(u == NULL) {
+			/* user doesn't exist */
+			if(send_u_notfound(c_hndl, uid) != 0) {
+				return -1;
+			}
+			break;
+		}
+
+		/* sanity check the message length field */
+		uint64_t payloadlen = decbe64(&m->message[1+0x20]);
+		if(1+0x20+0x08+payloadlen != m->length) {
+			fprintf(stderr, "%d: message length field does not "
+				"claimed length\n", c_hndl->fd);
+			return -1;
+		}
+
+		/* prepare the message to be sent to the end user */
+		uint64_t resplen = 1 + 0x20 + 0x08 + payloadlen;
+		uint8_t *resp = malloc(resplen);
+
+		resp[0] = 0;
+		memcpy(&resp[1], c_hndl->id, 0x20);
+		memcpy(&resp[0x20], &m->message[0x29], payloadlen);
+
+		struct client_handler *t_hndl = get_handler(uid);
+		if(t_hndl == NULL) {
+			/* user not logged in */
+			if(add_undelivered_message(u, resp, resplen) != 0) {
+				fprintf(stderr, "%d: failed to add to undel "
+				"file\n", c_hndl->fd);
+				return -1;
+			}
+			break;
+		}
+
+		if(send_message(t_hndl->hndl, t_hndl->keys,
+			resp, resplen) != 0) {
+			fprintf(stderr, "%d: failed to send message"
+				"to target %d\n", c_hndl->fd, t_hndl->fd);
+			return -1;
+		}
+
+		break;
+	}
+	case 1: {
+		struct user *u = user_db_get(uid);
+		if(u == NULL) {
+			if(send_u_notfound(c_hndl, uid) != 0) {
+				return -1;
+			}
+			break;
+		}
+
+		uint8_t *resp = malloc(1 + 0x20 +
+			rsa_pubkey_bufsize(u->pkey.bits));
+
+		if(resp == NULL) {
+			fprintf(stderr,
+				"%d: failed to allocate memory\n",
+				c_hndl->fd);
+			return -1;
+		}
+
+		resp[0] = 1;
+		memcpy(&resp[1], uid, 32);
+
+		rsa_pubkey2wire(&u->pkey, &resp[0x21],
+			rsa_pubkey_bufsize(u->pkey.bits));
+
+		if(send_message(c_hndl->hndl, c_hndl->keys, resp, 0x21 +
+			rsa_pubkey_bufsize(u->pkey.bits)) != 0) {	
+			fprintf(stderr,
+				"%d: failed to send response\n",
+				c_hndl->fd);
+			return -1;
+		}
+
+		break;
+	}
+	default:
+		fprintf(stderr, "%d: illegal message code %d\n",
+			c_hndl->fd, m->message[0]);
+		break;
+	}
+
+	return 0;
+}
+
+static int send_u_notfound(struct client_handler *c_hndl, uint8_t *uid) {
+	uint8_t *resp = malloc(1 + 0x20);
+	if(resp == NULL) {
+		fprintf(stderr,
+			"%d: failed to allocate memory\n",
+			c_hndl->fd);
+		return -1;
+	}
+
+	resp[0] = 0xff;
+	memcpy(&resp[1], uid, 32);
+
+	if(send_message(c_hndl->hndl, c_hndl->keys, resp,
+		1+0x20) != 0) {
+		fprintf(stderr,
+			"%d: failed to send response\n",
+			c_hndl->fd);
+
+		free(resp);
+		return -1;
+	}
+
+	free(resp);
+	return 0;
 }
 
 /* handler table data structure */

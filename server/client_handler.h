@@ -2,8 +2,11 @@
 #define IBCHAT_SERVER_CLIENT_HANDLER_H
 
 #include <pthread.h>
+#include <stdint.h>
 
+#include "../inet/protocol.h"
 #include "../inet/message.h"
+#include "../crypto/crypto_layer.h"
 
 struct client_handler {
 	pthread_t thread;

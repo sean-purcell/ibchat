@@ -1,0 +1,41 @@
+Message Format
+==============
+The format for messages sent from the client to the server
+
+0x00-0x01 Message type
+
+0: message to other user
+1: request for user's public key
+
+0
+-
+
+0x000-0x020 Target user
+0x020-0x028 Message length
+0x028-    X Message content, to be delivered to target user
+
+User not found is same as below
+
+Sent message format:
+
+0x000-0x001 0 (indicates message from other user)
+0x001-0x021 sender id number
+0x021-    X message content
+
+1
+-
+
+0x000-0x020 Target user
+
+Response format:
+
+User not found:
+0x000-0x001 0xff (user not found error)
+User found:
+0x000-0x001 1 (user public key)
+
+0x020-0x021 Target user
+
+User found:
+0x021-0x121 User public key
+

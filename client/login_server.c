@@ -12,6 +12,7 @@
 #include "login_server.h"
 #include "account.h"
 #include "connect_server.h"
+#include "ibchat_client.h"
 
 #include "../crypto/crypto_layer.h"
 #include "../util/line_prompt.h"
