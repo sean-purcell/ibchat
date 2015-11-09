@@ -436,7 +436,7 @@ void end_handlers() {
 			cur = cur->next;
 		}
 	}
-	release_readlock(&ht.l);
+	release_writelock(&ht.l);
 }
 
 void destroy_handler_table() {

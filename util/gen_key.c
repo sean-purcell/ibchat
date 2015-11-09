@@ -85,7 +85,7 @@ int gen_key(int argc, char **argv) {
 
 	memcpy(filename, argv[1], fname_size);
 
-	memcpy(&filename[fname_size], ".pri", 5);
+	filename[fname_size] = '\0';
 	ret = write_pri_key(&key, filename, password);
 	if(ret != 0) {
 		goto err;
