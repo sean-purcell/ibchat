@@ -19,6 +19,7 @@ static int valid_uname_char(char c) {
 }
 
 int valid_uname(char *uname, size_t ulen) {
+	if(ulen == 0 || ulen > 20) return 0;
 	int invalid = 0;
 	size_t i;
 	for(i = 0; i < ulen; i++) {
