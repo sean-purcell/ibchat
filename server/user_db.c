@@ -588,7 +588,6 @@ static int gen_undel_file(uint8_t *id) {
 int user_init(uint8_t *uid, RSA_PUBLIC_KEY pkey, struct user *u) {
 	memcpy(u->uid, uid, 0x20);
 
-	printf("GENERATING UNDEL FILE\n");
 	if(gen_undel_file(u->undel) != 0) {
 		return 1;
 	}
@@ -597,8 +596,6 @@ int user_init(uint8_t *uid, RSA_PUBLIC_KEY pkey, struct user *u) {
 	u->pkey.bits = pkey.bits;
 
 	u->pkey.n = BN_ZERO;
-	printf("COPYING PUBLIC KEY\n");
-	printf("%llx %llx\n", (unsigned long long) pkey.n.size, (unsigned long long) pkey.n.d);
 	if(bni_cpy(&u->pkey.n, &pkey.n) != 0) {
 		return 1;
 	}

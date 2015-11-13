@@ -69,14 +69,12 @@ static int user_register(uint8_t *uid, RSA_PUBLIC_KEY *pkey, int fd, struct con_
 		return ret;
 	}
 
-	printf("INITIALIZING USER\n");
 	/* add them to the user database */
 	struct user u;
 	if(user_init(uid, *pkey, &u) != 0) {
 		return -1;
 	}
 
-	printf("ADDING TO USER DATABASE\n");
 	if(user_db_add(u) != 0) {
 		return -1;
 	}
@@ -197,9 +195,6 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 			}
 			goto err3;
 		}
-		char buf[65];
-		to_hex(uid, 32, buf);
-		printf("%d: registered user %s\n", cli_hndl->fd, buf);
 	}
 
 	memset(challenge, 0, sizeof(challenge));
