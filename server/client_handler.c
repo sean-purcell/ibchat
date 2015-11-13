@@ -219,6 +219,7 @@ static int client_handle_loop(struct client_handler *c_hndl,
 	/* while the connection is alive */
 	while(handler_status(c_mgr->handler) == 0 && c_hndl->stop == 0) {
 		struct message *m = recv_message(c_hndl->hndl, keys, 1000000ULL);
+		if(m == NULL) continue;
 
 		handle_message(m, c_hndl);
 		free_message(m);
