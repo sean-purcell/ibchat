@@ -77,9 +77,6 @@ int select_profile() {
 }
 
 int handle_user() {
-	/* load list of friends, prompt to add new friends */
-	/* get unread messages from server */
-	sleep(5);
 	return 0;
 }
 

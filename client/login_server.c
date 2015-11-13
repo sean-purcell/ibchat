@@ -13,6 +13,7 @@
 #include "account.h"
 #include "connect_server.h"
 #include "ibchat_client.h"
+#include "uname.h"
 
 #include "../crypto/crypto_layer.h"
 #include "../util/line_prompt.h"
@@ -179,8 +180,7 @@ int create_account(struct account *acc, struct server_connection *sc) {
 		goto err;
 	}
 
-	printf("username: ");
-	uname = line_prompt(NULL, NULL, 0);
+	uname = getusername(NULL, stdout);
 	if(uname == NULL) {
 		fprintf(stderr, "failed to read username\n");
 		goto err;
