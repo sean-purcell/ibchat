@@ -27,7 +27,7 @@ struct friend {
 char *friendfile_path(struct account *acc);
 int init_friendfile(struct account *acc);
 int write_friendfile(struct account *acc);
-struct friend *read_friendfile(struct account *acc);
+int read_friendfile(struct account *acc);
 
 uint64_t friend_bin_size(struct friend *f);
 uint8_t *friend_write_bin(struct friend *f, uint8_t *ptr);
