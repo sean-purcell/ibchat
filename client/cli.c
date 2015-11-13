@@ -6,6 +6,7 @@
 #include "connect_server.h"
 #include "ibchat_client.h"
 #include "login_server.h"
+#include "friends.h"
 
 struct profile prof;
 struct account acc;
@@ -32,7 +33,9 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	handle_user();
+	if(handle_user() != 0) {
+		return 1;
+	}
 
 	/* TODO: disconnect and clean up */
 
@@ -60,6 +63,12 @@ int select_profile() {
 	} else { /* login an existing account */
 		if(login_account(&acc, &sc) != 0) {
 			fprintf(stderr, "failed to login account\n");
+			return 1;
+		}
+
+		/* load the friend file */
+		if(read_friendfile(&acc) != 0) {
+			fprintf(stderr, "failed to read friend file\n");
 			return 1;
 		}
 	}

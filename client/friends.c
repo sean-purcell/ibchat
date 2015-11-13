@@ -140,12 +140,11 @@ int read_friendfile(struct account *acc) {
 
 	FILE *ff = fopen(path, "rb");
 	if(ff == NULL) {
-		fprintf(stderr, "failed to open friendfile for reading: %s\n",
+		fprintf(stderr, "failed to open file for reading: %s\n",
 			path);
 		free(path);
 		return -1;
 	}
-	free(path);
 
 	uint64_t len = 0;
 	uint64_t fnum = 0;
@@ -161,14 +160,15 @@ int read_friendfile(struct account *acc) {
 
 	uint8_t *payload = NULL;
 
-	if(fread(prefix, 1, 48, ff) != 16) {
-		fprintf(stderr, "failed to read from friendfile\n");
+	if(fread(prefix, 1, 48, ff) != 48) {
+		fprintf(stderr, "failed to read file prefix: %s\n",
+			path);
 		goto err;
 	}
 
 	hmac_sha256(acc->f_hmac, 32, prefix, 16, mac1c);
 	if(memcmp_ct(mac1f, mac1c, 32) != 0) {
-		fprintf(stderr, "friendfile invalid\n");
+		fprintf(stderr, "file invalid: %s\n", path);
 		goto err;
 	}
 
@@ -189,7 +189,7 @@ int read_friendfile(struct account *acc) {
 	memcpy(payload, prefix, 48);
 
 	if(fread(&payload[48], 1, len - 48, ff) != len - 48) {
-		fprintf(stderr, "failed to read from friendfile\n");
+		fprintf(stderr, "failed to read file: %s\n", path);
 		goto err;
 	}
 
@@ -197,7 +197,7 @@ int read_friendfile(struct account *acc) {
 	mac2f = &payload[len - 32];
 
 	if(memcmp_ct(mac2f, mac2c, 32) != 0) {
-		fprintf(stderr, "friendfile invalid\n");
+		fprintf(stderr, "file invalid: %s\n", path);
 		goto err;
 	}
 
@@ -227,6 +227,7 @@ int read_friendfile(struct account *acc) {
 err:
 	ret = -1;
 end:
+	free(path);
 	fclose(ff);
 	if(payload) zfree(payload, len);
 	chacha_final(&cctx);
