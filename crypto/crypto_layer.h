@@ -5,8 +5,6 @@
 
 #include "../inet/protocol.h"
 
-#define INVALID_MAC 1
-
 struct keyset {
 	uint64_t nonce;
 	uint8_t send_symm_key[32];

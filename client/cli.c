@@ -13,6 +13,7 @@ struct server_connection sc;
 
 int init();
 int select_profile();
+int handle_user();
 
 int main(int argc, char **argv) {
 	/* initialize variables, etc. */
@@ -31,7 +32,9 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	sleep(5);
+	handle_user();
+
+	/* TODO: disconnect and clean up */
 
 	return 0;
 }
@@ -67,6 +70,7 @@ int select_profile() {
 int handle_user() {
 	/* load list of friends, prompt to add new friends */
 	/* get unread messages from server */
+	sleep(5);
 	return 0;
 }
 

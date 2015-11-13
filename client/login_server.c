@@ -270,6 +270,11 @@ int create_account(struct account *acc, struct server_connection *sc) {
 		goto serr;
 	}
 
+	if(init_account_file(acc) != 0) {
+		fprintf(stderr, "failed to init account file\n");
+		goto serr;
+	}
+
 	return 0;
 serr:
 	cleanup_server_connection(sc);

@@ -12,10 +12,19 @@ struct account {
 	uint8_t *key_bin; /* private key binary */
 	uint8_t sfing[32]; /* server key hash */
 
+	uint8_t f_file[32];
+	uint8_t f_symm[32];
+	uint8_t f_hmac[32];
+	uint64_t f_nonce;
+
+	struct friend *friends;
+
 	struct account *next;
 };
 
 int pick_account(struct profile *prof, struct account *acc);
+
+int init_account_file(struct account *acc);
 
 /* returns the binary space required for this account */
 uint64_t account_bin_size(struct account *acc);

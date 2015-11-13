@@ -50,7 +50,7 @@ int decrypt_message(struct keyset *keys, struct message *m, uint8_t *out, uint64
 	uint8_t res = memcmp_ct(mac, &m->message[8 + plen], 32);
 	if(res != 0) {
 		errno = EINVAL;
-		return INVALID_MAC;
+		return -1;
 	}
 
 	nonce = decbe64(m->message);
