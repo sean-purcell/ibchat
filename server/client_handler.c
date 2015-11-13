@@ -43,6 +43,7 @@ struct handler_table {
 struct ch_manager {
 	struct con_handle *handler;
 	pthread_t thread;
+	int fd;
 };
 
 void *client_handler(void *_arg);
@@ -126,6 +127,8 @@ void ch_cleanup_end_handler(void *_arg) {
 
 	end_handler(arg->handler);
 	pthread_join(arg->thread, NULL);
+
+	close(arg->fd);
 }
 
 void keys_cleanup_end_handler(void *keys) {
@@ -162,6 +165,7 @@ void *client_handler(void *_arg) {
 		fprintf(stderr, "%d: failed to launch handler thread\n", fd);
 		goto err2;
 	}
+	c_mgr.fd = fd;
 	pthread_cleanup_push(ch_cleanup_end_handler, &c_mgr);
 
 	/* complete the handshake */

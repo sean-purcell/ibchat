@@ -224,8 +224,6 @@ void add_message(struct con_handle *con, struct message *m) {
 static void handler_cleanup(void *_con) {
 	struct con_handle *con = ((struct con_handle *) _con);
 	end_handler(con);
-	if(con->sockfd != -1) close(con->sockfd);
-	con->sockfd = -1;
 	destroy_handler(con);
 }
 
