@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <sys/stat.h>
 
+#include <libibur/util.h>
+
 #include "ibchat_client.h"
 
 #include "../util/defaults.h"
@@ -75,5 +77,20 @@ static int check_root_dir() {
 		}
 	}
 	return 0;
+}
+
+char *file_path(uint8_t id[32]) {
+	size_t rootdir_len = strlen(ROOT_DIR);
+	char *fname = malloc(rootdir_len + 64 + 1);
+	if(fname == NULL) {
+		fprintf(stderr, "failed to allocate memory for path\n");
+		return NULL;
+	}
+
+	memcpy(fname, ROOT_DIR, rootdir_len);
+	to_hex(id, 32, &fname[rootdir_len]);
+	fname[rootdir_len + 64] = '\0';
+
+	return fname;
 }
 

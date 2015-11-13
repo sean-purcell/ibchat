@@ -17,18 +17,7 @@
 #include "friends.h"
 
 char *friendfile_path(struct account *acc) {
-	size_t rootdir_len = strlen(ROOT_DIR);
-	char *fname = malloc(rootdir_len + 64 + 1);
-	if(fname == NULL) {
-		fprintf(stderr, "failed to allocate memory for path\n");
-		return NULL;
-	}
-
-	memcpy(fname, ROOT_DIR, rootdir_len);
-	to_hex(acc->f_file, 32, &fname[rootdir_len]);
-	fname[rootdir_len + 64] = '\0';
-
-	return fname;
+	return file_path(acc->f_file);
 }
 
 int init_friendfile(struct account *acc) {
@@ -257,6 +246,8 @@ uint64_t friend_bin_size(struct friend *f) {
 	len += f->k_len;
 
 	len += 32;
+
+	len += 32;
 	len += 32;
 	len += 32;
 	len += 32;
@@ -276,6 +267,8 @@ uint8_t *friend_write_bin(struct friend *f, uint8_t *ptr) {
 
 	memcpy(ptr, f->uname, f->u_len); ptr += f->u_len;
 	memcpy(ptr, f->public_key, f->k_len); ptr += f->k_len;
+
+	memcpy(ptr, f->c_file, 32); ptr += 32;
 
 	memcpy(ptr, f->f_symm_key, 32); ptr += 32;
 	memcpy(ptr, f->f_hmac_key, 32); ptr += 32;
@@ -305,6 +298,8 @@ uint8_t *friend_parse_bin(struct friend *f, uint8_t *ptr) {
 	f->uname[f->u_len] = '\0';
 
 	memcpy(f->public_key, ptr, f->k_len); ptr += f->k_len;
+
+	memcpy(f->c_file, ptr, 32); ptr += 32;
 
 	memcpy(f->f_symm_key, ptr, 32); ptr += 32;
 	memcpy(f->f_hmac_key, ptr, 32); ptr += 32;
