@@ -1,0 +1,22 @@
+Conversation File Format
+========================
+
+0x000-0x008 File offset of the end, so that it can be written to easily
+0x008-0x010 Number of messages
+0x010-0x030 hmacsha256 of the first two fields
+0x030-END messages, as shown below
+
+Message format:
+0x000-0x008 Message length
+0x000-0x0
+0x008-0x028 mac 1 (see notes)
+0x028-    X message content, encrypted with the hmac key
+    X-X +32 mac 2
+
+mac 1 = the hmacsha256 of:
+	the previous field's end mac ||
+	the message length field
+
+mac 2 = thehmacsha256 of:
+	the entire message field from the start of the length field
+

@@ -11,6 +11,8 @@
 #include "login_server.h"
 #include "friends.h"
 #include "notifications.h"
+#include "bg_manager.h"
+#include "conversation.h"
 
 struct profile prof;
 struct account acc;
@@ -133,6 +135,11 @@ int handler_select() {
 	switch(sel) {
 	case 0:
 		stop = 1; break;
+	case 1:
+		if(select_conversation(&acc) != 0) {
+			stop = 1;
+		}
+		break;
 	default:
 		fprintf(stderr, "error occurred in selection\n");
 		stop = 1;
