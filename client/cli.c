@@ -1,16 +1,26 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "../util/lock.h"
+#include "../util/line_prompt.h"
+
 #include "account.h"
 #include "profile.h"
 #include "connect_server.h"
 #include "ibchat_client.h"
 #include "login_server.h"
 #include "friends.h"
+#include "notifications.h"
 
 struct profile prof;
 struct account acc;
 struct server_connection sc;
+
+struct notif *notifs;
+
+struct lock lock;
+
+int stop;
 
 int init();
 int select_profile();
@@ -76,7 +86,59 @@ int select_profile() {
 	return 0;
 }
 
+int handler_init();
+int handler_select();
+
 int handle_user() {
+	if(!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO)) {
+		fprintf(stderr, "ibchat must be run in a tty\n");
+		return 1;
+	}
+
+	if(handler_init() != 0) {
+		return 1;
+	}
+
+	while(handler_status(sc.ch) == 0 && stop == 0) {
+		/* print status and options */
+		handler_select();
+	}
+	if(handler_status(sc.ch) != 0) {
+		printf("server disconnected\n");
+	}
+	printf("exiting\n");
+	return 0;
+}
+
+int handler_init() {
+	stop = 0;
+	if(init_lock(&lock) != 0) {
+		return 1;
+	}
+
+	/* we should spawn the manager thread here */
+
+	return 0;
+}
+
+int handler_select() {
+	int notiflen = notiflist_len(notifs);
+	printf("%1d: message friend\n", 1);
+	printf("%1d: view %d notification(s)\n", 2, notiflen);
+	printf("%1d: add friend\n", 3);
+	printf("%1d: exit\n", 0);
+
+	uint64_t sel = num_prompt("selection", 0, 3);
+
+	switch(sel) {
+	case 0:
+		stop = 1; break;
+	default:
+		fprintf(stderr, "error occurred in selection\n");
+		stop = 1;
+		break;
+	}
+
 	return 0;
 }
 
