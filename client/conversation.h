@@ -18,5 +18,9 @@ int start_conversation(struct friend *f);
 int cfile_init(struct friend *f);
 struct cmessage *cfile_load(struct friend *f);
 
+struct cmessage *alloc_cmessage(uint64_t len);
+void free_cmessage(struct cmessage *m);
+void free_cmessage_list(struct cmessage *m);
+
 #endif
 

@@ -1,6 +1,8 @@
 Conversation File Format
 ========================
 
+All non-mac fields are encrypted
+
 0x000-0x008 File offset of the end, so that it can be written to easily
 0x008-0x010 Number of messages
 0x010-0x030 hmacsha256 of the first two fields
@@ -8,7 +10,7 @@ Conversation File Format
 
 Message format:
 0x000-0x008 Message length
-0x000-0x0
+0x008-0x010 Message sender
 0x008-0x028 mac 1 (see notes)
 0x028-    X message content, encrypted with the hmac key
     X-X +32 mac 2
