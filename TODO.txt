@@ -2,3 +2,5 @@ Minor things to add that will be forgotten:
 Userfile backups
 Account shutdown in the case of hijacks
 "online" friends
+switch to pthread_rwlock
+

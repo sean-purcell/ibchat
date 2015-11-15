@@ -45,7 +45,7 @@ int pick_account(struct profile *prof, struct account *acc) {
 		acc_list = acc_list->next;
 	}
 
-	uint64_t selection = num_prompt("selection", 0, idx);
+	uint64_t selection = num_prompt("selection", 0, idx-1);
 
 	if(selection == ULLONG_MAX) {
 		perror("failed to read response");
