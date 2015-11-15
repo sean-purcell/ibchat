@@ -456,7 +456,7 @@ struct client_handler *get_handler(uint8_t* id) {
 	struct client_handler *cur = ht.buckets[index];
 
 	while(cur != NULL) {
-		if(cur->id == id) {
+		if(memcmp(cur->id, id, 32) == 0) {
 			goto exit;
 		}
 
@@ -478,7 +478,7 @@ int add_handler(struct client_handler *handler) {
 
 	while(*loc != NULL) {
 		/* don't tolerate duplicates */
-		if((*loc)->id == handler->id) {
+		if(memcmp((*loc)->id, handler->id, 32) != 0) {
 			ret = 1;
 			goto exit;
 		}
@@ -510,7 +510,7 @@ int rem_handler(uint8_t* id) {
 	int ret = 0;
 
 	while(*loc != NULL) {
-		if((*loc)->id == id) {
+		if(memcmp((*loc)->id, id, 32) == 0) {
 			break;
 		}
 
