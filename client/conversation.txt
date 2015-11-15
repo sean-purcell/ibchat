@@ -1,7 +1,8 @@
 Conversation File Format
 ========================
 
-All non-mac fields are encrypted
+All non-mac fields are encrypted except for the prefix,
+the nonce for each message is its index
 
 0x000-0x008 File offset of the end, so that it can be written to easily
 0x008-0x010 Number of messages

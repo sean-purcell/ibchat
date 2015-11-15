@@ -168,14 +168,8 @@ struct cmessage *cfile_load(struct friend *f) {
 	memcpy(macf, &buf[16], 32);
 	MACCHK();
 
-	chacha_dec(f->f_symm_key, 32, 0, buf, buf, 16);
 	uint64_t flen = decbe64(&buf[0]);
 	uint64_t mnum = decbe64(&buf[8]);
-
-	if(mnum != f->f_nonce) {
-		fprintf(stderr, "conversation file invalid\n");
-		goto err;
-	}
 
 	memcpy(buf, macf, 32);
 
@@ -250,14 +244,130 @@ err:
 end:
 	free(path);
 	if(file) fclose(file);
-	release_readlock(&lock);
 	memsets(&octx, 0, sizeof(HMAC_SHA256_CTX));
 	memsets(&hctx, 0, sizeof(HMAC_SHA256_CTX));
 	chacha_final(&cctx);
 
 	memsets(tmp, 0, sizeof(tmp));
 
+	release_readlock(&lock);
 	return head;
+
+#undef READ
+}
+
+int cfile_add(struct friend *f, struct cmessage *m) {
+#define READ(buf, len) do {\
+	if(fread(buf, 1, len, file) != len) {\
+		fprintf(stderr, "conversation file read failed\n");\
+		goto err;\
+	}\
+	} while(0)
+
+#define WRITE(buf, len) do {\
+	if(fwrite(buf, 1, len, file) != len) {\
+		fprintf(stderr, "conversation file write failed\n");\
+		goto err;\
+	}\
+	} while(0)
+
+#define MACCHK() do {\
+	if(memcmp_ct(macf, macc, 0x20) != 0) {\
+		fprintf(stderr, "conversation file invalid\n");\
+		goto err;\
+	}\
+	} while(0)
+
+	int ret = 0;
+
+	acquire_writelock(&lock);
+
+	uint8_t *encm = NULL;
+	FILE *file = NULL;
+
+	char *path = file_path(f->c_file);
+	if(path == NULL) {
+		goto err;
+	}
+
+	file = fopen(path, "rb+");
+	if(file == NULL) {
+		fprintf(stderr, "failed to open conversation file: %s\n",
+			path);
+		goto err;
+	}
+
+	HMAC_SHA256_CTX hctx;
+	hmac_sha256_init(&hctx, f->f_hmac_key, 32);
+
+	CHACHA_CTX cctx;
+
+	uint8_t buf[0x30];
+	uint8_t macf[0x20];
+	uint8_t macc[0x20];
+
+	READ(buf, 0x30);
+
+	hmac_sha256(f->f_hmac_key, 32, buf, 16, macc);
+	memcpy(macf, &buf[16], 32);
+	MACCHK();
+
+	uint64_t flen = decbe64(&buf[0]);
+	uint64_t mnum = decbe64(&buf[8]);
+
+	uint64_t mlen = strlen(m->text);
+
+	/* write the new values in before we jump to the end */
+	encbe64(flen + 0x50 + mlen, &buf[0]);
+	encbe64(mnum + 1, &buf[8]);
+
+	hmac_sha256(f->f_hmac_key, 32, buf, 16, &buf[16]);
+	WRITE(buf, 0x30);
+
+	fseek(file, flen - 32, SEEK_SET);
+
+	READ(buf, 0x20);
+	fflush(file);
+	encbe64(mlen, &buf[32]);
+	encbe64(m->sender, &buf[40]);
+
+	chacha_init(&cctx, f->f_symm_key, 32, mnum + 1);
+	chacha_stream(&cctx, &buf[32], &buf[32], 16);
+
+	hmac_sha256(f->f_hmac_key, 32, buf, 0x30, macc);
+
+	WRITE(&buf[0x20], 0x10);
+	WRITE(macc, 0x20);
+
+	encm = malloc(mlen);
+	if(encm == NULL) {
+		fprintf(stderr, "failed to allocate memory\n");
+		goto err;
+	}
+
+	chacha_stream(&cctx, (uint8_t*)m->text, encm, mlen);
+	WRITE(encm, mlen);
+
+	hmac_sha256_init(&hctx, f->f_symm_key, 32);
+	hmac_sha256_update(&hctx, &buf[0x20], 10);
+	hmac_sha256_update(&hctx, macc, 32);
+	hmac_sha256_update(&hctx, encm, mlen);
+	hmac_sha256_final(&hctx, macc);
+
+	WRITE(macc, 32);
+
+	goto end;
+err:
+	ret = -1;
+end:
+	free(path);
+	if(file) fclose(file);
+	free(encm);
+	memsets(&hctx, 0, sizeof(HMAC_SHA256_CTX));
+	chacha_final(&cctx);
+
+	release_writelock(&lock);
+	return ret;
 
 #undef READ
 }
@@ -267,11 +377,12 @@ struct cmessage *alloc_cmessage(uint64_t len) {
 	if(m == NULL) {
 		return NULL;
 	}
-	m->text = malloc(len);
+	m->text = malloc(len + 1);
 	if(m->text == NULL) {
 		free(m);
 		return NULL;
 	}
+	m->text[len] = 0;
 
 	return m;
 }

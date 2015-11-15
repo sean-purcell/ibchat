@@ -257,7 +257,6 @@ uint64_t friend_bin_size(struct friend *f) {
 
 	len += 8;
 	len += 8;
-	len += 8;
 
 	return len;
 }
@@ -278,7 +277,6 @@ uint8_t *friend_write_bin(struct friend *f, uint8_t *ptr) {
 	memcpy(ptr, f->r_symm_key, 32); ptr += 32;
 	memcpy(ptr, f->r_hmac_key, 32); ptr += 32;
 
-	encbe64(f->f_nonce, ptr); ptr += 8;
 	encbe64(f->s_nonce, ptr); ptr += 8;
 	encbe64(f->r_nonce, ptr); ptr += 8;
 
@@ -309,7 +307,6 @@ uint8_t *friend_parse_bin(struct friend *f, uint8_t *ptr) {
 	memcpy(f->r_symm_key, ptr, 32); ptr += 32;
 	memcpy(f->r_hmac_key, ptr, 32); ptr += 32;
 
-	f->f_nonce = decbe64(ptr); ptr += 8;
 	f->s_nonce = decbe64(ptr); ptr += 8;
 	f->r_nonce = decbe64(ptr); ptr += 8;
 

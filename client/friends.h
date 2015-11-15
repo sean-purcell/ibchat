@@ -19,7 +19,6 @@ struct friend {
 	uint8_t s_hmac_key[32];
 	uint8_t r_symm_key[32];
 	uint8_t r_hmac_key[32];
-	uint64_t f_nonce;
 	uint64_t s_nonce;
 	uint64_t r_nonce;
 
