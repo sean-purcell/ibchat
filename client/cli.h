@@ -16,5 +16,11 @@ extern struct notif *notifs;
 
 extern struct lock lock;
 
+extern int mode;
+extern int stop;
+
+void set_mode(int v);
+int get_mode();
+
 #endif
 

@@ -64,13 +64,15 @@ void repaint_conv(struct friend *f, struct cmessage *head) {
 }
 
 int start_conversation(struct friend *f) {
+	cur_conv = f;
+	new_messages = NULL;
+	set_mode(1);
 	//int theight = termheight();
 	/* load enough messages to fill the screen */
 	struct cmessage *messages = cfile_load(f);
 
 	set_ctl(1);
 	clr_scrn();
-	
 
 	while(1) {
 		char c;
@@ -81,6 +83,9 @@ int start_conversation(struct friend *f) {
 	}
 
 	set_ctl(0);
+	set_mode(0);
+	cur_conv = NULL;
+	new_messages = NULL;
 }
 
 int cfile_init(struct friend *f) {

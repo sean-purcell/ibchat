@@ -12,6 +12,9 @@ struct cmessage {
 	struct cmessage *next, *prev;
 };
 
+struct friend *cur_conv;
+struct cmessage *new_messages;
+
 int select_conversation(struct account *acc);
 int start_conversation(struct friend *f);
 

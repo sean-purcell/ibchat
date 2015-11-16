@@ -4,6 +4,7 @@
 #include "../util/lock.h"
 #include "../util/line_prompt.h"
 
+#include "cli.h"
 #include "account.h"
 #include "profile.h"
 #include "connect_server.h"
@@ -21,6 +22,9 @@ struct server_connection sc;
 struct notif *notifs;
 
 struct lock lock;
+
+/* 0: default mode, 1: in conversation, 2: in friendreq, -1: stop */
+int mode;
 
 int stop;
 
@@ -108,12 +112,14 @@ int handle_user() {
 	if(handler_status(sc.ch) != 0) {
 		printf("server disconnected\n");
 	}
+	set_mode(-1);
 	printf("exiting\n");
 	return 0;
 }
 
 int handler_init() {
 	stop = 0;
+	mode = 0;
 	if(init_lock(&lock) != 0) {
 		return 1;
 	}
@@ -147,5 +153,18 @@ int handler_select() {
 	}
 
 	return 0;
+}
+
+void set_mode(int v) {
+	acquire_writelock(&lock);
+	mode = v;
+	release_writelock(&lock);
+}
+
+int get_mode() {
+	acquire_readlock(&lock);
+	int v = mode;
+	release_readlock(&lock);
+	return v;
 }
 
