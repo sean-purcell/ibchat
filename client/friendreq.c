@@ -28,6 +28,18 @@ int send_friendreq(struct server_connection *sc) {
 
 	/* insert wait for message here */
 
+	pthread_mutex_lock(&bg_lock);
+	pkey_resps = NULL;
+	pthread_mutex_unlock(&bg_lock);
+	set_mode(2);
+
+	pthread_mutex_lock(&bg_lock);
+	while(pkey_resps == NULL) {
+		pthread_cond_wait(&bg_wait, &bg_lock);
+	}
+	set_mode(0);
+	pthread_mutex_unlock(&bg_lock);
+
 	uint8_t *pkey = NULL;
 	uint64_t pkeylen = 0;
 
