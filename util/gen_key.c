@@ -97,7 +97,7 @@ int gen_key(int argc, char **argv) {
 		goto err;
 	}
 
-	fprintf(stderr, "private key written to %s.pri\n"
+	fprintf(stderr, "private key written to %s\n"
 	        "public key written to %s.pub\n", argv[1], argv[1]);
 
 	free(filename);
