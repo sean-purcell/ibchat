@@ -145,13 +145,12 @@ static int prompt_verify_skey(struct account *acc, RSA_PUBLIC_KEY *key, int firs
 		acc->addr, hexhash, ohexhash);
 	}
 
-	char *resp = line_prompt(NULL, NULL, 0);
-	if(resp == NULL) {
-		fprintf(stderr, "failed to read response\n");
+	int resp = yn_prompt();
+	if(resp == -1) {
 		return -1;
 	}
 
-	if(resp[0] == 'y') {
+	if(resp == 1) {
 		memcpy(acc->sfing, hash, 32);
 		return firsttime ? 0 : 1;
 	} else {
@@ -350,6 +349,10 @@ int login_account(struct account *acc, struct server_connection *sc) {
 		goto serr;
 	}
 	if(servresp == 1) {
+		int resp = yn_prompt();
+		if(resp != 1) {
+			goto serr;
+		}
 		printf("registering user %s at %s\n", acc->uname, acc->addr);
 
 		if(send_message(sc->ch, &sc->keys, (uint8_t*) "register", 8) != 0) {

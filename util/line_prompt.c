@@ -136,3 +136,22 @@ inv:
 	goto start;
 }
 
+int yn_prompt() {
+	int ret = 0;
+	char *ans = line_prompt(NULL, NULL, 0);
+	if(ans == NULL) {
+		perror("failed to read response");
+		ret = -1;
+		goto end;
+	}
+
+	if((ans[0] | 32) != 'y') {
+		ret = 1;
+		goto end;
+	}
+
+end:
+	free(ans);
+	return ret;
+}
+

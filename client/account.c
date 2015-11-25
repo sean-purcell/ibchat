@@ -20,13 +20,12 @@ int pick_account(struct profile *prof, struct account *acc) {
 	if(prof->server_accounts == NULL) {
 		printf("no accounts found\nregister a new one? [y/n] ");
 
-		char *ans = line_prompt(NULL, NULL, 0);
-		if(ans == NULL) {
-			perror("failed to read response");
+		int ans = yn_prompt();
+		if(ans == -1) {
 			return -1;
 		}
 
-		if((ans[0] | 32) != 'y') {
+		if(ans == 0) {
 			return 1;
 		}
 

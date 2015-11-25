@@ -66,13 +66,8 @@ int register_profile(char *pass, struct profile *prof) {
 	printf("profile not found\ncreate new profile? [y/n] ");
 	fflush(stdout);
 
-	char *ans = line_prompt(NULL, NULL, 0);
-	if(ans == NULL) {
-		perror("failed to read response");
-	}
-
-	if((ans[0] | 32) != 'y') {
-		free(ans);
+	int ans = yn_prompt();
+	if(ans != 1) {
 		return 1;
 	}
 
