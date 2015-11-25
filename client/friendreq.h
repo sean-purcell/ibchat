@@ -10,7 +10,7 @@ struct friendreq {
 	uint8_t pkey;
 };
 
-struct message *pkey_resps;
+struct message *pkey_resp;
 
 int send_friendreq(struct server_connection *sc);
 

@@ -20,6 +20,8 @@ extern int mode;
 extern int stop;
 
 void set_mode(int v);
+/* NOTE: SHOULD ONLY BE CALLED IF LOCK IS ALREADY HELD */
+void set_mode_no_lock(int v);
 int get_mode();
 
 #endif

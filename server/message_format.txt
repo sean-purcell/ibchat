@@ -20,7 +20,8 @@ Sent message format:
 
 0x000-0x001 0 (indicates message from other user)
 0x001-0x021 sender id number
-0x021-    X message content
+0x021-0x029 message length
+0x029-    X message content
 
 1
 -
@@ -34,7 +35,7 @@ User not found:
 User found:
 0x000-0x001 1 (user public key)
 
-0x020-0x021 Target user
+0x001-0x021 Target user
 
 User found:
 0x021-0x121 User public key

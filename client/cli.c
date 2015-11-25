@@ -157,8 +157,12 @@ int handler_select() {
 
 void set_mode(int v) {
 	acquire_writelock(&lock);
-	mode = v;
+	set_mode_no_lock(v);
 	release_writelock(&lock);
+}
+
+void set_mode_no_lock(int v) {
+	mode = v;
 }
 
 int get_mode() {

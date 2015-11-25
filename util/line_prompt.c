@@ -145,7 +145,7 @@ int yn_prompt() {
 		goto end;
 	}
 
-	if((ans[0] | 32) != 'y') {
+	if((ans[0] | 32) == 'y') {
 		ret = 1;
 		goto end;
 	}

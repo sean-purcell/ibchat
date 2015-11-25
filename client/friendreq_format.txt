@@ -1,0 +1,16 @@
+Friend Request Message Format
+=============================
+Prefix follows format outlaid in server/message_format.txt
+
+0x000-0x008 length of encrypted key block
+0x000-0x100 symmetric key and hmac key for the rest of the message, encrypted with target's public key
+0x100-    X friend request payload
+    X-X+256 signature with sender's public key
+
+Payload format
+--------------
+0x000-0x008 length of username
+0x008-0x010 length of public key
+0x010-    X username, not null terminated, must match sender id
+    X-    Y public key (note: this should be checked externally, never trust the server) 
+
