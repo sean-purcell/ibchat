@@ -41,8 +41,11 @@ int send_friendreq(struct server_connection *sc) {
 	set_mode(2);
 
 	pthread_mutex_lock(&bg_lock);
-	while(pkey_resp == NULL) {
+	while(pkey_resp == NULL && get_mode() == 2) {
 		pthread_cond_wait(&bg_wait, &bg_lock);
+	}
+	if(get_mode() == -1) {
+		goto err;
 	}
 	set_mode(0);
 	pthread_mutex_unlock(&bg_lock);

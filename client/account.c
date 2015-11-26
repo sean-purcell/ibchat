@@ -155,6 +155,7 @@ uint8_t *account_parse_bin(struct account **acc, uint8_t *ptr) {
 	memcpy(ap->f_symm, ptr, 0x20); ptr += 0x20;
 	memcpy(ap->f_hmac, ptr, 0x20); ptr += 0x20;
 
+	ap->friends = NULL;
 	ap->next = NULL;
 
 	*acc = ap;

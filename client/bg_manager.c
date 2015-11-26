@@ -47,11 +47,23 @@ void *background_thread(void *_arg) {
 		}
 	}
 
-	fprintf(stderr, "background thread crashed, exiting\n");
+	fprintf(stderr, "background thread crashed\n");
 	acquire_writelock(&lock);
 	stop = 1;
 	release_writelock(&lock);
 
+	set_mode(-1);
+	pthread_cond_broadcast(&bg_wait);
+
 	return NULL;
+}
+
+int start_bg_thread(struct server_connection *sc) {
+	if(pthread_create(&bg_manager, NULL, background_thread, sc) != 0) {
+		fprintf(stderr, "failed to start background thread\n");
+		return -1;
+	}
+
+	return 0;
 }
 

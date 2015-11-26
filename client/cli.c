@@ -2,6 +2,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <ibcrypt/sha256.h>
+
+#include <libibur/util.h>
+
 #include "../util/lock.h"
 #include "../util/line_prompt.h"
 
@@ -15,6 +19,7 @@
 #include "notifications.h"
 #include "bg_manager.h"
 #include "conversation.h"
+#include "friendreq.h"
 
 struct profile prof;
 struct account *acc;
@@ -28,6 +33,8 @@ struct lock lock;
 int mode;
 
 int stop;
+
+static char keysig[65];
 
 int init();
 int select_profile();
@@ -134,13 +141,26 @@ int handler_init() {
 		return 1;
 	}
 
+	uint8_t hash[32];
+	sha256(acc->key_bin, acc->k_len, hash);
+	to_hex(hash, 32, keysig);
+
 	/* we should spawn the manager thread here */
+	if(start_bg_thread(&sc) != 0) {
+		return 1;
+	}
 
 	return 0;
 }
 
 int handler_select() {
 	int notiflen = notiflist_len(notifs);
+
+	printf("user: %s\n"
+		"fingerprint: %s\n",
+		acc->uname,
+		keysig);
+
 	printf("%1d: message friend\n", 1);
 	printf("%1d: view %d notification(s)\n", 2, notiflen);
 	printf("%1d: add friend\n", 3);
@@ -153,6 +173,11 @@ int handler_select() {
 		stop = 1; break;
 	case 1:
 		if(select_conversation(acc) != 0) {
+			stop = 1;
+		}
+		break;
+	case 3:
+		if(send_friendreq(&sc) != 0) {
 			stop = 1;
 		}
 		break;
