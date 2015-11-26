@@ -3,6 +3,7 @@
 #include "bg_manager.h"
 #include "login_server.h"
 #include "cli.h"
+#include "friendreq.h"
 
 pthread_t bg_manager;
 
@@ -16,11 +17,29 @@ int add_umessage(struct message *m) {
 }
 
 int add_pkeyresp(struct message *m) {
-	return -1;
+	pthread_mutex_lock(&bg_lock);
+	if(get_mode() != 2) {
+		pthread_mutex_unlock(&bg_lock);
+		return -1;
+	}
+
+	pkey_resp = m;
+	pthread_cond_broadcast(&bg_wait);
+	pthread_mutex_unlock(&bg_lock);
+	return 0;
 }
 
 int add_unotfound(struct message *m) {
-	return -1;
+	pthread_mutex_lock(&bg_lock);
+	if(get_mode() != 2) {
+		pthread_mutex_unlock(&bg_lock);
+		return -1;
+	}
+
+	pkey_resp = m;
+	pthread_cond_broadcast(&bg_wait);
+	pthread_mutex_unlock(&bg_lock);
+	return 0;
 }
 
 void *background_thread(void *_arg) {
