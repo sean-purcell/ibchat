@@ -8,15 +8,15 @@
 
 #include <libibur/endian.h>
 
+#include "../util/line_prompt.h"
+
 #include "account.h"
 #include "profile.h"
 #include "login_server.h"
 #include "ibchat_client.h"
 #include "friends.h"
 
-#include "../util/line_prompt.h"
-
-int pick_account(struct profile *prof, struct account *acc) {
+int pick_account(struct profile *prof, struct account **acc) {
 	if(prof->server_accounts == NULL) {
 		printf("no accounts found\nregister a new one? [y/n] ");
 
@@ -58,8 +58,7 @@ int pick_account(struct profile *prof, struct account *acc) {
 		acc_list = prof->server_accounts;
 		while(acc_list) {
 			if(idx == selection) {
-				*acc = *acc_list;
-				acc->next = NULL;
+				*acc = acc_list;
 
 				goto found;
 			}
@@ -155,6 +154,8 @@ uint8_t *account_parse_bin(struct account **acc, uint8_t *ptr) {
 	memcpy(ap->f_file, ptr, 0x20); ptr += 0x20;
 	memcpy(ap->f_symm, ptr, 0x20); ptr += 0x20;
 	memcpy(ap->f_hmac, ptr, 0x20); ptr += 0x20;
+
+	ap->next = NULL;
 
 	*acc = ap;
 	return ptr;

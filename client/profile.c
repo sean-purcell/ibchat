@@ -9,6 +9,7 @@
 #include "profile.h"
 #include "account.h"
 #include "userfile.h"
+#include "ibchat_client.h"
 
 #include "../util/line_prompt.h"
 
@@ -137,6 +138,11 @@ int rewrite_profile(struct profile *prof) {
 	}
 
 	return 0;
+}
+
+int check_userfile(struct profile *prof) {
+	if(!userfile_dirty) return 0;
+	return rewrite_profile(prof);
 }
 
 int profile_reseed(struct profile *prof) {

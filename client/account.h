@@ -22,7 +22,7 @@ struct account {
 	struct account *next;
 };
 
-int pick_account(struct profile *prof, struct account *acc);
+int pick_account(struct profile *prof, struct account **acc);
 
 int init_account_file(struct account *acc);
 

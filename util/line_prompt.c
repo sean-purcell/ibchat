@@ -113,7 +113,7 @@ start:;
 		return ULLONG_MAX;
 	}
 
-	if(strlen(resp) > 18) {
+	if(strlen(resp) > 18 || strlen(resp) < 1) {
 		goto inv;
 	}
 

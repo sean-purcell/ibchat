@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "../util/lock.h"
@@ -16,7 +17,7 @@
 #include "conversation.h"
 
 struct profile prof;
-struct account acc;
+struct account *acc;
 struct server_connection sc;
 
 struct notif *notifs;
@@ -66,24 +67,33 @@ int select_profile() {
 	}
 
 	if(ret == 0x55) { /* register a new account */
-		if(create_account(&acc, &sc) != 0) {
+		acc = malloc(sizeof(*acc));
+		if(acc == NULL) {
+			fprintf(stderr, "failed to allocate memory\n");
+			return 1;
+		}
+		if(create_account(acc, &sc) != 0) {
 			fprintf(stderr, "failed to register account\n");
 			return 1;
 		}
 
 		/* we should write the user file again */
-		if(add_account(&prof, &acc) != 0) {
+		if(add_account(&prof, acc) != 0) {
 			fprintf(stderr, "failed to add account to user file\n");
 			return 1;
 		}
 	} else { /* login an existing account */
-		if(login_account(&acc, &sc) != 0) {
+		if(login_account(acc, &sc) != 0) {
 			fprintf(stderr, "failed to login account\n");
 			return 1;
 		}
 
+		if(check_userfile(&prof) != 0) {
+			return 1;
+		}
+
 		/* load the friend file */
-		if(read_friendfile(&acc) != 0) {
+		if(read_friendfile(acc) != 0) {
 			fprintf(stderr, "failed to read friend file\n");
 			return 1;
 		}
@@ -142,7 +152,7 @@ int handler_select() {
 	case 0:
 		stop = 1; break;
 	case 1:
-		if(select_conversation(&acc) != 0) {
+		if(select_conversation(acc) != 0) {
 			stop = 1;
 		}
 		break;

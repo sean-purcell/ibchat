@@ -9,7 +9,7 @@
 #include "../util/lock.h"
 
 extern struct profile prof;
-extern struct account acc;
+extern struct account *acc;
 extern struct server_connection sc;
 
 extern struct notif *notifs;
