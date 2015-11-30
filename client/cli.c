@@ -185,6 +185,9 @@ int handler_select() {
 
 	uint64_t sel = num_prompt("selection", 0, 3);
 
+	if(get_mode() != 0) {
+		return 0;
+	}
 	switch(sel) {
 	case 0:
 		stop = 1; break;

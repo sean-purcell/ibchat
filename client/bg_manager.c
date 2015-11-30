@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#include <sys/time.h>
+
 #include <libibur/util.h>
 
 #include "bg_manager.h"
@@ -52,6 +54,9 @@ void *background_thread(void *_arg) {
 
 	while(get_mode() != -1) {
 		struct message *m = recv_message(sc->ch, &sc->keys, WAITTIME);
+		if(handler_status(sc->ch) != 0) {
+			set_mode(-1);
+		}
 		if(m == NULL) continue;
 
 		int ret = 0;
