@@ -28,6 +28,8 @@ int init_friendfile(struct account *acc) {
 		return -1;
 	}
 
+	acc->friends = NULL;
+
 	memcpy(acc->f_file, &buf[ 0], 32);
 	memcpy(acc->f_symm, &buf[32], 32);
 	memcpy(acc->f_hmac, &buf[64], 32);
@@ -60,7 +62,6 @@ int init_friendfile(struct account *acc) {
 	return write_friendfile(acc);
 }
 
-
 int write_friendfile(struct account *acc) {
 	char *path = friendfile_path(acc);
 	if(path == NULL) {
@@ -77,7 +78,7 @@ int write_friendfile(struct account *acc) {
 	}
 	free(path);
 
-	uint64_t len = 8 + 8 + 32;
+	uint64_t len = 8 + 8 + 8 + 32;
 	uint64_t fnum = 0;
 	struct friend *cur = acc->friends;
 	while(cur) {
@@ -89,19 +90,20 @@ int write_friendfile(struct account *acc) {
 
 	payload = malloc(len);
 	if(payload == NULL) {
-		fprintf(stderr, "failed to allocate memory for payload\n");
 	}
 
 	CHACHA_CTX cctx;
 	chacha_init(&cctx, acc->f_symm, 32, acc->f_nonce);
 
-	encbe64(fnum, &payload[0]);
-	encbe64( len, &payload[8]);
-	chacha_stream(&cctx, payload, payload, 16);
-	hmac_sha256(acc->f_hmac, 32, payload, 16, &payload[16]);
+	encbe64(acc->f_nonce, &payload[ 0]);
+	encbe64(        fnum, &payload[ 8]);
+	encbe64(         len, &payload[16]);
+	chacha_stream(&cctx, &payload[8], &payload[8], 16);
+	hmac_sha256(acc->f_hmac, 32, payload, 24, &payload[24]);
+
 
 	cur = acc->friends;
-	uint8_t *ptr = payload + 8 + 8 + 32;
+	uint8_t *ptr = payload + 8 + 8 + 8 + 32;
 	while(cur) {
 		ptr = friend_write_bin(cur, ptr);
 	}
@@ -111,7 +113,7 @@ int write_friendfile(struct account *acc) {
 		goto err;
 	}
 
-	chacha_stream(&cctx, payload + 48, payload + 48, ptr - payload - 48);
+	chacha_stream(&cctx, payload + 56, payload + 56, ptr - payload - 56);
 	chacha_final(&cctx);
 
 	hmac_sha256(acc->f_hmac, 32, payload, len - 32, &payload[len - 32]);
@@ -149,9 +151,9 @@ int read_friendfile(struct account *acc) {
 	uint64_t len = 0;
 	uint64_t fnum = 0;
 
-	uint8_t prefix[48];
+	uint8_t prefix[56];
 	uint8_t tmpp[16];
-	uint8_t *mac1f = &prefix[16];
+	uint8_t *mac1f = &prefix[24];
 	uint8_t mac1c[32];
 	uint8_t *mac2f = NULL;
 	uint8_t mac2c[32];
@@ -160,20 +162,21 @@ int read_friendfile(struct account *acc) {
 
 	uint8_t *payload = NULL;
 
-	if(fread(prefix, 1, 48, ff) != 48) {
+	if(fread(prefix, 1, 56, ff) != 56) {
 		fprintf(stderr, "failed to read file prefix: %s\n",
 			path);
 		goto err;
 	}
 
-	hmac_sha256(acc->f_hmac, 32, prefix, 16, mac1c);
+	hmac_sha256(acc->f_hmac, 32, prefix, 24, mac1c);
 	if(memcmp_ct(mac1f, mac1c, 32) != 0) {
 		fprintf(stderr, "file invalid: %s\n", path);
 		goto err;
 	}
 
-	memcpy(tmpp, prefix, 16);
+	memcpy(tmpp, &prefix[8], 16);
 
+	acc->f_nonce = decbe64(prefix);
 	chacha_init(&cctx, acc->f_symm, 32, acc->f_nonce);
 
 	chacha_stream(&cctx, tmpp, tmpp, 16);
@@ -186,9 +189,9 @@ int read_friendfile(struct account *acc) {
 		goto err;
 	}
 
-	memcpy(payload, prefix, 48);
+	memcpy(payload, prefix, 56);
 
-	if(fread(&payload[48], 1, len - 48, ff) != len - 48) {
+	if(fread(&payload[56], 1, len - 56, ff) != len - 56) {
 		fprintf(stderr, "failed to read file: %s\n", path);
 		goto err;
 	}
@@ -201,10 +204,10 @@ int read_friendfile(struct account *acc) {
 		goto err;
 	}
 
-	chacha_stream(&cctx, &payload[48], &payload[48], len - 80);
+	chacha_stream(&cctx, &payload[56], &payload[56], len - 88);
 
 	struct friend **cur = &acc->friends;
-	uint8_t *ptr = &payload[48];
+	uint8_t *ptr = &payload[56];
 	uint64_t i;
 	for(i = 0; i < fnum; i++) {
 		*cur = malloc(sizeof(struct friend));
