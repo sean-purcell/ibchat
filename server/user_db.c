@@ -9,6 +9,7 @@
 #include <stdio.h>
 
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #include <libibur/endian.h>
 #include <libibur/util.h>
@@ -461,6 +462,9 @@ static int init_user_dir(char *root_dir) {
 }
 
 int user_db_init(char *root_dir) {
+	/* set the umask */
+	umask(0077);
+
 	/* set up the table */
 	if(init_user_db_st() != 0) {
 		return 1;

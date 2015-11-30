@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <wordexp.h>
 #include <errno.h>
+
 #include <sys/stat.h>
+#include <sys/types.h>
 
 #include <libibur/util.h>
 
@@ -18,7 +20,9 @@ int userfile_dirty = 0;
 
 static int expand_root_dir();
 static int check_root_dir();
+static int set_umask();
 int init() {
+	if(set_umask() != 0) return 1;
 	if(expand_root_dir() != 0) return 1;
 	if(check_root_dir() != 0) return 1;
 
@@ -76,6 +80,11 @@ static int check_root_dir() {
 			return -1;
 		}
 	}
+	return 0;
+}
+
+static int set_umask() {
+	umask(0077);
 	return 0;
 }
 
