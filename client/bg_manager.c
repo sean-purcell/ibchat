@@ -1,5 +1,7 @@
 #include <stdio.h>
 
+#include <libibur/util.h>
+
 #include "bg_manager.h"
 #include "login_server.h"
 #include "cli.h"
@@ -13,7 +15,10 @@ pthread_cond_t bg_wait  = PTHREAD_COND_INITIALIZER;
 #define WAITTIME ((uint64_t) 1e5)
 
 int add_umessage(struct message *m) {
-	return -1;
+	char buf[65536];
+	to_hex(m->message, m->length, buf);
+	printf("message received: %s\n", buf);
+	return 0;
 }
 
 int add_pkeyresp(struct message *m) {

@@ -3,8 +3,10 @@
 #include <unistd.h>
 
 #include <ibcrypt/sha256.h>
+#include <ibcrypt/rsa_util.h>
 
 #include <libibur/util.h>
+#include <libibur/endian.h>
 
 #include "../util/lock.h"
 #include "../util/line_prompt.h"
@@ -141,9 +143,24 @@ int handler_init() {
 		return 1;
 	}
 
-	uint8_t hash[32];
-	sha256(acc->key_bin, acc->k_len, hash);
-	to_hex(hash, 32, keysig);
+	{
+		uint64_t keylen = rsa_pubkey_bufsize(decbe64(acc->key_bin));
+		uint8_t *pkey = malloc(keylen);
+		if(pkey == NULL) {
+			fprintf(stderr, "failed to allocate memory\n");
+			return 1;
+		}
+		if(rsa_wire_prikey2pubkey(acc->key_bin, acc->k_len,
+			pkey, keylen) != 0) {
+			fprintf(stderr, "failed to convert key to public\n");
+			return 1;
+		}
+		uint8_t hash[32];
+		sha256(pkey, keylen, hash);
+		to_hex(hash, 32, keysig);
+
+		free(pkey);
+	}
 
 	/* we should spawn the manager thread here */
 	if(start_bg_thread(&sc) != 0) {
@@ -177,7 +194,7 @@ int handler_select() {
 		}
 		break;
 	case 3:
-		if(send_friendreq(&sc) != 0) {
+		if(send_friendreq(&sc, acc) != 0) {
 			stop = 1;
 		}
 		break;

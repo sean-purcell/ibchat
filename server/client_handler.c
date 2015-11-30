@@ -265,7 +265,8 @@ static int handle_message(struct message *m, struct client_handler *c_hndl) {
 
 		resp[0] = 0;
 		memcpy(&resp[1], c_hndl->id, 0x20);
-		memcpy(&resp[0x20], &m->message[0x29], payloadlen);
+		encbe64(payloadlen, &resp[0x21]);
+		memcpy(&resp[0x29], &m->message[0x29], payloadlen);
 
 		struct client_handler *t_hndl = get_handler(uid);
 		if(t_hndl == NULL) {

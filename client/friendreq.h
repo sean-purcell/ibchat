@@ -4,6 +4,7 @@
 #include "../inet/message.h"
 
 #include "login_server.h"
+#include "account.h"
 
 struct friendreq {
 	char *uname;
@@ -12,7 +13,7 @@ struct friendreq {
 
 struct message *pkey_resp;
 
-int send_friendreq(struct server_connection *sc);
+int send_friendreq(struct server_connection *sc, struct account *acc);
 
 #endif
 
