@@ -12,7 +12,7 @@ pthread_t bg_manager;
 pthread_mutex_t bg_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t bg_wait  = PTHREAD_COND_INITIALIZER;
 
-#define WAITTIME ((uint64_t) 1e5)
+#define WAITTIME ((uint64_t) 100000ULL)
 
 int add_umessage(struct message *m) {
 	char buf[65536];
