@@ -17,6 +17,11 @@ struct account {
 	uint8_t f_hmac[32];
 	uint64_t f_nonce;
 
+	uint8_t n_file[32];
+	uint8_t n_symm[32];
+	uint8_t n_hmac[32];
+	uint64_t n_nonce;
+
 	struct friend *friends;
 
 	struct account *next;

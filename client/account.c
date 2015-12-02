@@ -15,6 +15,7 @@
 #include "login_server.h"
 #include "ibchat_client.h"
 #include "friends.h"
+#include "notifications.h"
 
 int pick_account(struct profile *prof, struct account **acc) {
 	if(prof->server_accounts == NULL) {
@@ -77,7 +78,7 @@ int pick_account(struct profile *prof, struct account **acc) {
 }
 
 int init_account_file(struct account *acc) {
-	return init_friendfile(acc);
+	return init_friendfile(acc) | init_notiffile(acc);
 }
 
 /* returns the binary space required for this account */
@@ -89,6 +90,9 @@ uint64_t account_bin_size(struct account *acc) {
 	size += acc->u_len;
 	size += acc->a_len;
 	size += acc->k_len;
+	size += 0x20;
+	size += 0x20;
+	size += 0x20;
 	size += 0x20;
 	size += 0x20;
 	size += 0x20;
@@ -110,6 +114,9 @@ uint8_t *account_write_bin(struct account *acc, uint8_t *ptr) {
 	memcpy(ptr, acc->f_file, 0x20); ptr += 0x20;
 	memcpy(ptr, acc->f_symm, 0x20); ptr += 0x20;
 	memcpy(ptr, acc->f_hmac, 0x20); ptr += 0x20;
+	memcpy(ptr, acc->n_file, 0x20); ptr += 0x20;
+	memcpy(ptr, acc->n_symm, 0x20); ptr += 0x20;
+	memcpy(ptr, acc->n_hmac, 0x20); ptr += 0x20;
 
 	return ptr;
 }
@@ -154,6 +161,9 @@ uint8_t *account_parse_bin(struct account **acc, uint8_t *ptr) {
 	memcpy(ap->f_file, ptr, 0x20); ptr += 0x20;
 	memcpy(ap->f_symm, ptr, 0x20); ptr += 0x20;
 	memcpy(ap->f_hmac, ptr, 0x20); ptr += 0x20;
+	memcpy(ap->n_file, ptr, 0x20); ptr += 0x20;
+	memcpy(ap->n_symm, ptr, 0x20); ptr += 0x20;
+	memcpy(ap->n_hmac, ptr, 0x20); ptr += 0x20;
 
 	ap->friends = NULL;
 	ap->next = NULL;

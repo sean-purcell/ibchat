@@ -7,8 +7,11 @@
 #include "account.h"
 
 struct friendreq {
+	uint64_t u_len;
+	uint64_t k_len;
+
 	char *uname;
-	uint8_t pkey;
+	uint8_t *pkey;
 };
 
 struct message *pkey_resp;

@@ -1,11 +1,11 @@
 Friend File Format
 ==================
 
-0x000-0x008 File nonce
-0x008-0x010 Number of friends N encrypted with CHACHA
-0x010-0x018 File length
-0x018-0x038 HMAC signature of the file up to that point
-0x038-    X encrypted friend payload, with N friend blocks in a row
+0x000-0x008 Number of friends
+0x008-0x010 Length of payload
+0x010-0x030 Random salt to determine the encryption key (gen'ed every write)
+0x030-0x050 hmacsha256 of the prefix
+0x050-    X encrypted friend payload, with N friend blocks in a row
     X-X+ 32 HMAC signature of the file up to that point
 
 Friend block format

@@ -13,7 +13,7 @@ Message format:
 0x000-0x008 Message length
 0x008-0x010 Message sender
 0x008-0x028 mac 1 (see notes)
-0x028-    X message content, encrypted with the hmac key
+0x028-    X message content, encrypted with the symm key
     X-X +32 mac 2
 
 mac 1 = the hmacsha256 of:

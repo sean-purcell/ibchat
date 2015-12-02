@@ -21,11 +21,5 @@ Passwords are derived with scrypt with parameters N=2^16,r=8,p=1
 encrypted data:
 0x000-0x008 Y - number of logins
 Y times:
-0x000-0x008 length of username
-0x008-0x010 length of server address
-0x010-0x018 length of private key
-0x018-    X username
-    X-    Y server address
-    Y-    Z private key
-    Z- Z+32 server public key fingerprint
+view account.[ch]
 

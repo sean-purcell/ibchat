@@ -1,0 +1,36 @@
+Notification File Format
+========================
+
+0x000-0x008 Number of messages
+0x008-0x010 Length of payload
+0x010-0x030 Random salt to determine the encryption key (gen'ed every write)
+0x030-0x050 hmacsha256 of the prefix
+0x050-    X payload
+    X-X +32 hmacsha256 of the entire message
+
+payload format
+--------------
+Repeated message blocks of the form:
+0x000-0x001 message type
+
+type:
+
+1
+-
+0x001-0x021 friend c_file (an easily available identifier)
+0x021-0x029 number of unread
+
+2
+-
+0x001-0x009 length of uname
+0x009-0x011 length of pkey
+0x011-    X uname
+    X-    Y pkey
+
+3
+-
+0x001-0x021 friend c_file (an easily available identifier)
+
+encryption key:
+sha256(symm_key || message_salt)
+
