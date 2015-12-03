@@ -14,6 +14,7 @@ struct format_desc {
 };
 
 int write_datafile(char *path, void *arg, void *data, struct format_desc *f);
+int read_datafile(char *path, void *arg, void **data, struct format_desc *f);
 
 #endif
 

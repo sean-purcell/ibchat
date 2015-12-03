@@ -39,6 +39,14 @@ int write_datafile(char *path, void *arg, void *data, struct format_desc *f) {
 		goto err;
 	}
 
+	void *cur = data;
+	while(cur) {
+		payload_len += f->datalen(cur);
+		payload_num++;
+
+		cur = *((void **) ((char*)cur + f->next_off));
+	}
+
 	encbe64(payload_num, &prefix[0]);
 	encbe64(payload_len, &prefix[8]);
 	if(cs_rand(&prefix[0x10], 0x20) != 0) {
@@ -63,14 +71,6 @@ int write_datafile(char *path, void *arg, void *data, struct format_desc *f) {
 	sha256_update(&kctx, symm_key, 0x20);
 	sha256_update(&kctx, &prefix[0x10], 0x20);
 	sha256_final(&kctx, enc_key);
-
-	void *cur = data;
-	while(cur) {
-		payload_len += f->datalen(cur);
-		payload_num++;
-
-		cur = *((void **) ((char*)cur + f->next_off));
-	}
 
 	payload = malloc(payload_len);
 	if(payload == NULL) {
@@ -97,17 +97,19 @@ int write_datafile(char *path, void *arg, void *data, struct format_desc *f) {
 
 	HMAC_SHA256_CTX hctx;
 	hmac_sha256_init(&hctx, hmac_key, 0x20);
-	hmac_sha256_update(&hctx, prefix, sizeof(prefix));
+	hmac_sha256_update(&hctx, prefix, pref_len);
 	hmac_sha256_update(&hctx, payload, payload_len);
 
 	uint8_t mac[0x20];
 	hmac_sha256_final(&hctx, mac);
 
-	if(fwrite(prefix, 1, sizeof(prefix), ff) != sizeof(prefix)) {
+	if(fwrite(prefix, 1, pref_len, ff) != pref_len) {
 		goto writerr;
 	}
-	if(fwrite(payload, 1, payload_len, ff) != payload_len) {
-		goto writerr;
+	if(payload_len > 0) {
+		if(fwrite(payload, 1, payload_len, ff) != payload_len) {
+			goto writerr;
+		}
 	}
 	if(fwrite(mac, 1, 0x20, ff) != 0x20) {
 		goto writerr;
@@ -202,12 +204,12 @@ int read_datafile(char *path, void *arg, void **data, struct format_desc *f) {
 
 	HMAC_SHA256_CTX hctx;
 	hmac_sha256_init(&hctx, hmac_key, 0x20);
-	hmac_sha256_update(&hctx, prefix, sizeof(prefix));
+	hmac_sha256_update(&hctx, prefix, pref_len);
 	hmac_sha256_update(&hctx, payload, payload_len);
 	hmac_sha256_final(&hctx, mac2c);
 
 	if(memcmp_ct(mac2c, mac2f, 0x20) != 0) {
-		fprintf(stderr, "failed to allocate memory\n");
+		fprintf(stderr, "invalid file\n");
 		goto err;
 	}
 
@@ -245,7 +247,7 @@ err:
 	return ret;
 
 readerr:
-	fprintf(stderr, "failed to write to file: %s\n", path);
+	fprintf(stderr, "failed to read from file: %s\n", path);
 	goto err;
 
 }
