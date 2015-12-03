@@ -74,6 +74,10 @@ int select_profile() {
 		fprintf(stderr, "failed to pick account\n");
 		return 1;
 	}
+	if(ret == 1) {
+		printf("there are no accounts to use, exiting.\n");
+		return 1;
+	}
 
 	if(ret == 0x55) { /* register a new account */
 		acc = malloc(sizeof(*acc));

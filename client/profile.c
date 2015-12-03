@@ -4,6 +4,7 @@
 #include <ibcrypt/zfree.h>
 #include <ibcrypt/scrypt.h>
 
+#include <libibur/util.h>
 #include <libibur/endian.h>
 
 #include "profile.h"
@@ -49,11 +50,7 @@ int login_profile(char *pass, struct profile *prof) {
 
 	int ret;
 	if((ret = read_userfile(prof)) != 0) {
-		if(ret == UF_INV_PASS) {
-			printf("invalid password or user file\n");
-		} else {
-			fprintf(stderr, "failed to read userfile: %d\n", ret);
-		}
+		fprintf(stderr, "failed to read userfile: %d\n", ret);
 		goto err;
 	}
 
@@ -190,5 +187,35 @@ int gen_profile(struct profile *data) {
 	memset(scrypt_out, 0, 96);
 
 	return 0;
+}
+
+int key_expand(struct profile *prof) {
+	int ret = -1;
+
+	uint8_t scrypt_out[0x60];
+	uint8_t *pw_check = &scrypt_out[0x00];
+	uint8_t *symm_key = &scrypt_out[0x20];
+	uint8_t *hmac_key = &scrypt_out[0x40];
+
+	if(scrypt(prof->pass, strlen(prof->pass), prof->salt, 32,
+		(uint64_t)1 << 16, 8, 1, 96, scrypt_out) != 0) {
+		fprintf(stderr, "failed to expand password\n");
+		goto err;
+	}
+
+	if(memcmp_ct(pw_check, prof->pw_check, 0x20) != 0) {
+		fprintf(stderr, "password incorrect\n");
+		goto err;
+	}
+
+	memcpy(prof->pw_check, pw_check, 0x20);
+	memcpy(prof->symm_key, symm_key, 0x20);
+	memcpy(prof->hmac_key, hmac_key, 0x20);
+
+	prof->expanded = 1;
+	ret = 0;
+err:
+	memsets(scrypt_out, 0, sizeof(scrypt_out));
+	return ret;
 }
 

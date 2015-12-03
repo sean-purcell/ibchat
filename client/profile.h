@@ -14,6 +14,8 @@ struct profile {
 	uint64_t nonce;
 
 	struct account *server_accounts;
+
+	int expanded;
 };
 
 int login_profile(char *pass, struct profile *acc);
@@ -26,6 +28,9 @@ int profile_reseed(struct profile *prof);
 
 /* generates a random keyset */
 int gen_profile(struct profile *data);
+
+/* expands the password into a key */
+int key_expand(struct profile *prof);
 
 #endif
 
