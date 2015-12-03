@@ -90,6 +90,7 @@ int write_datafile(char *path, void *arg, void *data, struct format_desc *f) {
 	}
 	if(ptr - payload != payload_len) {
 		fprintf(stderr, "written length does not match expected\n");
+		goto err;
 	}
 
 	chacha_enc(enc_key, 0x20, 0, payload, payload, payload_len);
@@ -223,8 +224,13 @@ int read_datafile(char *path, void *arg, void **data, struct format_desc *f) {
 
 		cur = (void **) ((char*)(*cur) + f->next_off);
 	}
+	if(i != payload_num) {
+		fprintf(stderr, "read num does not match expected\n");
+		goto err;
+	}
 	if(ptr - payload != payload_len) {
 		fprintf(stderr, "read length does not match expected\n");
+		goto err;
 	}
 
 	ret = 0;
