@@ -32,7 +32,7 @@ int read_friendfile(struct account *acc);
 
 uint64_t friend_bin_size(struct friend *f);
 uint8_t *friend_write_bin(struct friend *f, uint8_t *ptr);
-uint8_t *friend_parse_bin(struct friend *f, uint8_t *ptr);
+uint8_t *friend_parse_bin(struct friend **_f, uint8_t *ptr);
 
 void friend_free(struct friend *f);
 void friend_free_list(struct friend *f);

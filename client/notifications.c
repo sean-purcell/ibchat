@@ -63,8 +63,6 @@ int init_notiffile(struct account *acc) {
 
 	free(fname);
 
-	acc->n_nonce = 0;
-
 	return write_notiffile(acc, NULL);
 }
 
