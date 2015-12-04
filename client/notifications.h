@@ -33,7 +33,7 @@ int write_notiffile(struct account *acc, struct notif *notifs);
 
 uint64_t notif_bin_len(struct notif *n);
 uint8_t *notif_bin_write(struct notif *n, uint8_t *ptr);
-uint8_t *notif_bin_parse(struct account *acc, struct notif *n, uint8_t *ptr);
+uint8_t *notif_bin_parse(struct account *acc, struct notif **n, uint8_t *ptr);
 
 #endif
 

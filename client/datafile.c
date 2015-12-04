@@ -219,7 +219,7 @@ int read_datafile(char *path, void *arg, void **data, struct format_desc *f) {
 	uint8_t *ptr = payload;
 	uint64_t i;
 	for(i = 0; (ptr - payload) < payload_len && i < payload_num; i++) {
-		ptr = f->dataread(cur, ptr);
+		ptr = f->dataread(cur, arg, ptr);
 		if(ptr == NULL) {
 			goto err;
 		}

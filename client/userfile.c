@@ -107,7 +107,7 @@ static uint8_t *uf_datawrite(void *_data, uint8_t *ptr) {
 	return account_write_bin((struct account *) _data, ptr);
 }
 
-static uint8_t *uf_dataread(void **_data, uint8_t *ptr) {
+static uint8_t *uf_dataread(void **_data, void *arg, uint8_t *ptr) {
 	return account_parse_bin((struct account **) _data, ptr);
 }
 

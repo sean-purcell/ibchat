@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <errno.h>
+#include <stddef.h>
 
 #include <sys/stat.h>
 
@@ -13,6 +14,47 @@
 #include "cli.h"
 #include "ibchat_client.h"
 #include "notifications.h"
+#include "datafile.h"
+
+static int nf_p_fill(void *_arg, uint8_t *ptr) {
+	return 0;
+}
+
+static int nf_s_key(void *_arg, uint8_t *ptr, uint8_t *key) {
+	struct account *arg = (struct account *) _arg;
+	memcpy(key, arg->n_symm, 0x20);
+	return 0;
+}
+
+static int nf_h_key(void *_arg, uint8_t *ptr, uint8_t *key) {
+	struct account *arg = (struct account *) _arg;
+	memcpy(key, arg->n_hmac, 0x20);
+	return 0;
+}
+
+static uint64_t nf_datalen(void *_data) {
+	return notif_bin_len((struct notif *) _data);
+}
+
+static uint8_t *nf_datawrite(void *_data, uint8_t *ptr) {
+	return notif_bin_write((struct notif *) _data, ptr);
+}
+
+static uint8_t *nf_dataread(void **_data, void *arg, uint8_t *ptr) {
+	return notif_bin_parse((struct account *) arg, (struct notif **) _data, ptr);
+}
+
+static struct format_desc nf_format = {
+	0x00,
+	nf_p_fill,
+	nf_s_key,
+	nf_h_key,
+
+	offsetof(struct notif, next),
+	nf_datalen,
+	nf_datawrite,
+	nf_dataread,
+};
 
 int notiflist_len(struct notif *n) {
 	acquire_readlock(&lock);
@@ -67,94 +109,24 @@ int init_notiffile(struct account *acc) {
 }
 
 int write_notiffile(struct account *acc, struct notif *notifs) {
-	int ret = -1;
-
+	int ret;
 	char *path = file_path(acc->n_file);
 	if(path == NULL) {
 		return -1;
 	}
+	ret = write_datafile(path, acc, notifs, &nf_format);
+	free(path);
+	return ret;
+}
 
-	FILE *ff = fopen(path, "wb");
-	if(ff == NULL) {
-		fprintf(stderr, "failed to open notiffile for writing: %s\n",
-			path);
-		free(path);
+int read_notiffile(struct account *acc, struct notif **notifs) {
+	int ret;
+	char *path = file_path(acc->n_file);
+	if(path == NULL) {
 		return -1;
 	}
-	uint64_t payload_len = 0;
-	uint64_t notif_num = 0;
-	uint8_t *payload = NULL;
-
-	struct notif *cur = notifs;
-	while(cur) {
-		payload_len += notif_bin_len(cur);
-		notif_num++;
-		cur = cur->next;
-	}
-
-	uint8_t prefix[0x50];
-
-	encbe64(  notif_num, &prefix[0]);
-	encbe64(payload_len, &prefix[8]);
-	if(cs_rand(&prefix[16], 32) != 0) {
-		fprintf(stderr, "failed to generate random numbers\n");
-		goto err;
-	}
-	hmac_sha256(acc->n_hmac, 32, prefix, 0x30, &prefix[0x30]);
-
-	if(fwrite(prefix, 1, sizeof(prefix), ff) != sizeof(prefix)) {
-		fprintf(stderr, "failed to write to notiffile: %s\n", path);
-		goto err;
-	}
-
-	if((payload = malloc(payload_len)) == NULL) {
-		goto err;
-	}
-
-	cur = notifs;
-	uint8_t *ptr = payload;
-	while(cur) {
-		ptr = notif_bin_write(cur, ptr);
-		cur = cur->next;
-	}
-	if(ptr - payload != payload_len) {
-		fprintf(stderr, "payload length does not match written\n");
-		goto err;
-	}
-
-	uint8_t key[0x20];
-	SHA256_CTX kctx;
-	sha256_init(&kctx);
-	sha256_update(&kctx, acc->n_symm, 0x20);
-	sha256_update(&kctx, &prefix[0x10], 0x20);
-	sha256_final(&kctx, key);
-
-	chacha_enc(key, 0x20, 0, payload, payload, payload_len);
-
-	memsets(key, 0, sizeof(key));
-
-	if(fwrite(payload, 1, payload_len, ff) != payload_len) {
-		fprintf(stderr, "failed to write to notiffile: %s\n", path);
-		goto err;
-	}
-
-	uint8_t mac[0x20];
-	HMAC_SHA256_CTX hctx;
-	hmac_sha256_init(&hctx, acc->n_hmac, 32);
-	hmac_sha256_update(&hctx, prefix, sizeof(prefix));
-	hmac_sha256_update(&hctx, payload, payload_len);
-	hmac_sha256_final(&hctx, mac);
-	if(fwrite(mac, 1, 0x20, ff) != 0x20) {
-		fprintf(stderr, "failed to write to notiffile: %s\n", path);
-		goto err;
-	}
-
-	ret = 0;
-err:
-	fclose(ff);
-	if(payload) zfree(payload, payload_len);
+	ret = read_datafile(path, acc, (void**)notifs, &nf_format);
 	free(path);
-
 	return ret;
 }
 
@@ -203,7 +175,11 @@ uint8_t *notif_bin_write(struct notif *n, uint8_t *ptr) {
 	return ptr;
 }
 
-uint8_t *notif_bin_parse(struct account *acc, struct notif *n, uint8_t *ptr) {
+uint8_t *notif_bin_parse(struct account *acc, struct notif **_n, uint8_t *ptr) {
+	struct notif *n = malloc(sizeof(struct notif));
+	if(n == NULL) {
+		goto memfail;
+	}
 	n->type = *ptr;
 	ptr++;
 
@@ -248,6 +224,8 @@ uint8_t *notif_bin_parse(struct account *acc, struct notif *n, uint8_t *ptr) {
 		ptr += n->freq->k_len;
 		break;
 	}
+
+	*_n = n;
 
 	return ptr;
 

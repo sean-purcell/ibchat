@@ -43,7 +43,7 @@ static uint8_t *ff_datawrite(void *_data, uint8_t *ptr) {
 	return friend_write_bin((struct friend *) _data, ptr);
 }
 
-static uint8_t *ff_dataread(void **_data, uint8_t *ptr) {
+static uint8_t *ff_dataread(void **_data, void *arg, uint8_t *ptr) {
 	return friend_parse_bin((struct friend **) _data, ptr);
 }
 
