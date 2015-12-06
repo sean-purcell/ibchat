@@ -136,6 +136,35 @@ inv:
 	goto start;
 }
 
+uint64_t num_prompt_no_retry(char *prompt, uint64_t min, uint64_t max) {
+	int64_t res = 0;
+	char *resp = line_prompt(prompt, NULL, 0);
+	if(resp == NULL) {
+		return ULLONG_MAX;
+	}
+
+	if(strlen(resp) > 18 || strlen(resp) < 1) {
+		goto inv;
+	}
+
+	for(int i = 0; i < strlen(resp); i++) {
+		int dig = resp[i] - '0';
+		if(dig < 0 || dig > 9) {
+			goto inv;
+		}
+
+		res = res * 10 + dig;
+	}
+
+	if(res < min || res > max) {
+		goto inv;
+	}
+
+	return res;
+inv:
+	return ULLONG_MAX - 1;
+}
+
 int yn_prompt() {
 	int ret = 0;
 	char *ans = line_prompt(NULL, NULL, 0);

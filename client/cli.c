@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -174,6 +175,8 @@ int handler_init() {
 	return 0;
 }
 
+void wait_for_event();
+
 int handler_select() {
 	int notiflen = notiflist_len(notifs);
 
@@ -187,11 +190,26 @@ int handler_select() {
 	printf("%1d: add friend\n", 3);
 	printf("%1d: exit\n", 0);
 
-	uint64_t sel = num_prompt("selection", 0, 3);
+	uint64_t sel;
+	printf("selection: ");
+	do {
+		/* wait for input or system to exit */
+		fflush(stdout);
+		wait_for_event();
+		if(get_mode() != 0) {
+			return 0;
+		}
 
-	if(get_mode() != 0) {
+		sel = num_prompt_no_retry(NULL, 0, 3);
+		if(sel == ULLONG_MAX - 1) {
+			printf("invalid response, try again: ");
+		}
+	} while(sel == ULLONG_MAX - 1);
+
+	if(sel == ULLONG_MAX) {
 		return 0;
 	}
+
 	switch(sel) {
 	case 0:
 		stop = 1; break;
@@ -212,6 +230,21 @@ int handler_select() {
 	}
 
 	return 0;
+}
+
+void wait_for_event() {
+	while(get_mode() == 0) {
+		fd_set fds;
+		FD_SET(STDIN_FILENO, &fds);
+		struct timeval wait;
+		wait.tv_sec = 0;
+		wait.tv_usec = 100000L;
+
+		select(STDIN_FILENO + 1, &fds, NULL, NULL, &wait);
+		if(FD_ISSET(STDIN_FILENO, &fds)) {
+			break;
+		}
+	}
 }
 
 void set_mode(int v) {
