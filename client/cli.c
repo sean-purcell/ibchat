@@ -37,15 +37,17 @@ int mode;
 
 int stop;
 
+FILE *lgf; /* logfile */
+
 static char keysig[65];
 
-int init();
+int init(int argc, char **argv);
 int select_profile();
 int handle_user();
 
 int main(int argc, char **argv) {
 	/* initialize variables, etc. */
-	if(init() != 0) {
+	if(init(argc, argv) != 0) {
 		fprintf(stderr, "failed to initialize ibchat client\n");
 		return 1;
 	}

@@ -6,6 +6,7 @@ extern char *ROOT_DIR;
 extern char *PORT;
 
 extern int userfile_dirty;
+extern int debug_mode;
 
 char *file_path(uint8_t id[32]);
 

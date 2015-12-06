@@ -3,28 +3,62 @@
 #include <stdio.h>
 #include <wordexp.h>
 #include <errno.h>
+#include <getopt.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
 
 #include <libibur/util.h>
 
-#include "ibchat_client.h"
-
 #include "../util/defaults.h"
+
+#include "ibchat_client.h"
+#include "cli.h"
 
 char *ROOT_DIR = "~/.ibchat/";
 
 /* this should be set to 1 by any function that modifies the userfile */
 int userfile_dirty = 0;
 
+int debug_mode = 0;
+
+static int process_opts(int argc, char **argv);
 static int expand_root_dir();
 static int check_root_dir();
 static int set_umask();
-int init() {
+static int open_logfile();
+int init(int argc, char **argv) {
+	if(process_opts(argc, argv) != 0) return 1;
 	if(set_umask() != 0) return 1;
 	if(expand_root_dir() != 0) return 1;
 	if(check_root_dir() != 0) return 1;
+	if(open_logfile() != 0) return 1;
+
+	return 0;
+}
+
+static int process_opts(int argc, char **argv) {
+	struct option long_opts[] = {
+		{ "debug", no_argument, 0, 'd' },
+		{ 0, 0, 0, 0 },
+	};
+
+	while(1) {
+		int opt_index = 0;
+		int c = getopt_long(argc, argv, "d", long_opts, &opt_index);
+		if(c == -1) {
+			break;
+		}
+
+		switch(c) {
+		case 'd':
+			printf("debug mode enabled\n");
+			debug_mode = 1;
+			break;
+		case '?':
+			return -1;
+		}
+	}
 
 	return 0;
 }
@@ -85,6 +119,31 @@ static int check_root_dir() {
 
 static int set_umask() {
 	umask(0077);
+	return 0;
+}
+
+static int open_logfile() {
+	if(debug_mode) {
+		/* logfile should be stderr */
+		lgf = stderr;
+	} else {
+		/* lgf should point to the .ibchat/ibchat.log */
+		char *pathend = "/ibchat.log";
+		size_t len = strlen(ROOT_DIR) + strlen(pathend) + 1;
+		char *path = malloc(len);
+		if(path == NULL) {
+			fprintf(stderr, "failed to allocate memory\n");
+			return -1;
+		}
+		strcpy(path, ROOT_DIR);
+		strcat(path, pathend);
+
+		lgf = fopen(path, "a");
+		if(lgf == NULL) {
+			fprintf(stderr, "failed to open log file\n");
+			return -1;
+		}
+	}
 	return 0;
 }
 

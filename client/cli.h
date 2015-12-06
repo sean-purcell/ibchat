@@ -19,6 +19,8 @@ extern struct lock lock;
 extern int mode;
 extern int stop;
 
+extern FILE *lgf;
+
 void set_mode(int v);
 /* NOTE: SHOULD ONLY BE CALLED IF LOCK IS ALREADY HELD */
 void set_mode_no_lock(int v);
