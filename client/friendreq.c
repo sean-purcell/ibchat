@@ -260,3 +260,10 @@ err:;
 	return ret;
 }
 
+void free_friendreq(struct friendreq *freq) {
+	if(!freq) return;
+	zfree(freq->uname, freq->u_len);
+	zfree(freq->pkey, freq->k_len);
+	zfree(freq, sizeof(*freq));
+}
+

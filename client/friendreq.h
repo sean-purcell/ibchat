@@ -17,6 +17,7 @@ struct friendreq {
 struct message *pkey_resp;
 
 int send_friendreq(struct server_connection *sc, struct account *acc);
+void free_friendreq(struct friendreq *freq);
 
 #endif
 
