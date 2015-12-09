@@ -27,6 +27,7 @@ struct notif {
 };
 
 int notiflist_len(struct notif *n);
+int insert_notif(struct notif *n);
 
 int init_notiffile(struct account *acc);
 int write_notiffile(struct account *acc, struct notif *notifs);

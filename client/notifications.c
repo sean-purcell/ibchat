@@ -70,6 +70,22 @@ int notiflist_len(struct notif *n) {
 	return num;
 }
 
+int insert_notif(struct notif *n) {
+	int ret = 0;
+	acquire_writelock(&lock);
+
+	struct notif **cur = &notifs;
+	while(*cur) {
+		cur = &(*cur)->next;
+	}
+
+	*cur = n;
+
+	ret = write_notiffile(acc, notifs);
+	release_writelock(&lock);
+	return ret;
+}
+
 int init_notiffile(struct account *acc) {
 	uint8_t buf[96];
 
