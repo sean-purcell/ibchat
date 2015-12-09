@@ -153,7 +153,9 @@ static int send_pkey_req(struct server_connection *sc, uint8_t target[32]) {
 	return 0;
 }
 
-static int send_friendreq_message(struct server_connection *sc, struct account *acc, uint8_t target[32], uint8_t *pkey, uint64_t pkeylen) {
+static int send_friendreq_message(struct server_connection *sc,
+	struct account *acc, uint8_t target[32], uint8_t *pkey,
+	uint64_t pkeylen) {
 	int ret = -1;
 
 	uint64_t encblen = (decbe64(pkey) + 7) / 8;
@@ -259,6 +261,125 @@ err:;
 
 	return ret;
 }
+
+int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
+	int ret = -1, inv = -1;
+
+	char s_hex[65];
+	to_hex(sender, 0x20, s_hex);
+
+	RSA_KEY rkey;
+	memset(&rkey, 0, sizeof(rkey));
+
+	RSA_PUBLIC_KEY pkey;
+	memset(&pkey, 0, sizeof(pkey));
+
+	uint8_t keys[64];
+	uint8_t *symm = &keys[ 0];
+	uint8_t *hmac = &keys[32];
+	uint8_t mac[32];
+
+	struct friendreq *freq = NULL;
+
+	/* keyblock and datablock */
+	uint64_t kb_len = decbe64(&payload[1]);
+	uint64_t db_len = decbe64(&payload[9]);
+
+	if(kb_len + db_len + 17 >= p_len) {
+		fprintf(lgf, "invalid block lengths\n");
+		goto inv;
+	}
+
+	/* expand the private key */
+	if(rsa_wire2prikey(acc->key_bin, acc->k_len, &rkey) != 0) {
+		fprintf(stderr, "failed to expand private key\n");
+		goto err;
+	}
+
+	/* decrypt the message */
+	if(rsa_oaep_decrypt(&rkey, &payload[0x11], kb_len, keys, 64) != 0) {
+		fprintf(lgf, "invalid enc block\n");
+		goto inv;
+	}
+
+	uint8_t *data = &payload[17 + kb_len];
+
+	hmac_sha256(hmac, 32, data, db_len - 32, mac);
+	if(memcmp_ct(mac, &data[db_len-32], 32) != 0) {
+		fprintf(lgf, "invalid mac\n");
+		goto inv;
+	}
+
+	chacha_dec(symm, 32, 0, data, data, db_len - 32);
+
+	/* start building the friendreq struct */
+	freq = malloc(sizeof(*freq));
+	if(freq == NULL) {
+		fprintf(stderr, "failed to allocate memory\n");
+		goto err;
+	}
+	freq->u_len = decbe64(&data[0]);
+	freq->k_len = decbe64(&data[8]);
+	freq->uname = malloc(freq->u_len + 1);
+	freq->pkey = malloc(freq->k_len + 1);
+
+	if(freq->uname == NULL || freq->pkey == NULL) {
+		fprintf(stderr, "failed to allocate memory\n");
+		goto err;
+	}
+
+	memcpy(freq->uname, &data[16], freq->u_len);
+	memcpy(freq->pkey, &data[16+freq->u_len], freq->k_len);
+
+	uint64_t siglen = (decbe64(freq->pkey) + 7) / 8;
+
+	if(p_len != kb_len + db_len + 17 + siglen) {
+		goto inv;
+	}
+
+	/* now verify the message */
+	if(rsa_wire2pubkey(freq->pkey, freq->k_len, &pkey) != 0) {
+		fprintf(lgf, "failed to expand public key\n");
+		goto inv;
+	}
+
+	int valid = 0;
+	if(rsa_pss_verify(&pkey, &payload[p_len-siglen], siglen, payload,
+		p_len-siglen, &valid) != 0) {
+		goto inv;
+	}
+	if(!valid) {
+		goto inv;
+	}
+
+	/* everything is valid, place it in the queue */
+	struct notif *n = malloc(sizeof(struct notif));
+	if(n == NULL) {
+		fprintf(stderr, "failed to allocate memory\n");
+		goto err;
+	}
+
+	n->type = 2;
+	n->freq = freq;
+
+	insert_notif(n);
+
+end:
+	ret = 0;
+	inv = 0;
+err:
+	rsa_free_prikey(&rkey);
+	rsa_free_pubkey(&pkey);
+	memsets(keys, 0, sizeof(keys));
+	memsets(mac, 0, sizeof(mac));
+	if(ret || inv) free_friendreq(freq);
+	return ret;
+inv:
+/* invalid message reject it but do not error */
+	fprintf(lgf, "invalid friendreq from %s\n", s_hex);
+	goto end;
+}
+
 
 void free_friendreq(struct friendreq *freq) {
 	if(!freq) return;
