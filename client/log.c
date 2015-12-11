@@ -30,6 +30,7 @@ void LOG(char *format, ...) {
 	va_list args;
 	va_start(args, format);
 	vfprintf(lgf, format, args);
+	fprintf(lgf, "\n");
 	fflush(lgf);
 	va_end(args);
 	if(debug_mode) {
