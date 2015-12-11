@@ -29,7 +29,7 @@ pthread_mutex_t net_lock = PTHREAD_MUTEX_INITIALIZER;
 int acquire_netlock() {
 	pthread_mutex_lock(&net_lock);
 	int s = get_mode();
-	if(s) {
+	if(s == -1) {
 		pthread_mutex_unlock(&net_lock);
 		return 1;
 	}

@@ -17,7 +17,7 @@ static void print_time() {
 	tm_info = localtime(&tv.tv_sec);
 
 	strftime(time, 26, "%Y:%m:%d %H:%M:%S", tm_info);
-	fprintf(lgf, "%s:%d - ", time, tv.tv_usec / 1000);
+	fprintf(lgf, "%s:%.3d - ", time, tv.tv_usec / 1000);
 }
 
 void LOG(char *format, ...) {
