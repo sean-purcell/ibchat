@@ -9,6 +9,9 @@ struct lock {
 	int use_state;
 };
 
+#define LOCK_STRUCT_INIT \
+	{ PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, 0 };
+
 void acquire_readlock(struct lock *l);
 
 void release_readlock(struct lock *l);

@@ -30,7 +30,7 @@ struct server_connection sc;
 
 struct notif *notifs;
 
-struct lock lock;
+struct lock lock = LOCK_STRUCT_INIT;
 
 /* 0: default mode, 1: in conversation, 2: in friendreq, -1: stop */
 int mode;
@@ -146,10 +146,6 @@ int handle_user() {
 int handler_init() {
 	stop = 0;
 	mode = 0;
-	if(init_lock(&lock) != 0) {
-		return 1;
-	}
-
 	{
 		uint64_t keylen = rsa_pubkey_bufsize(decbe64(acc->key_bin));
 		uint8_t *pkey = malloc(keylen);

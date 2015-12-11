@@ -21,7 +21,23 @@ pthread_t bg_manager;
 pthread_mutex_t bg_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t bg_wait  = PTHREAD_COND_INITIALIZER;
 
+pthread_mutex_t net_lock = PTHREAD_MUTEX_INITIALIZER;
+
 #define WAITTIME ((uint64_t) 100000ULL)
+
+int acquire_netlock() {
+	pthread_mutex_lock(&net_lock);
+	int s = get_mode();
+	if(s) {
+		pthread_mutex_unlock(&net_lock);
+		return 1;
+	}
+	return 0;
+}
+
+void release_netlock() {
+	pthread_mutex_unlock(&net_lock);
+}
 
 int add_umessage(struct message *m) {
 	int ret = 0;
@@ -58,8 +74,6 @@ int add_umessage(struct message *m) {
 	return ret;
 }
 
-}
-
 int add_pkeyresp(struct message *m) {
 	pthread_mutex_lock(&bg_lock);
 	if(get_mode() != 2) {
@@ -90,11 +104,15 @@ void *background_thread(void *_arg) {
 	struct server_connection *sc = (struct server_connection *) _arg;
 
 	while(get_mode() != -1) {
+		if(acquire_netlock() != 0) break;
 		struct message *m = recv_message(sc->ch, &sc->keys, WAITTIME);
 		if(handler_status(sc->ch) != 0) {
 			set_mode(-1);
 		}
-		if(m == NULL) continue;
+		if(m == NULL) {
+			release_netlock();
+			continue;
+		}
 
 		int ret = 0;
 		switch(m->message[0]) {
@@ -111,7 +129,9 @@ void *background_thread(void *_arg) {
 		if(ret != 0) {
 			break;
 		}
+		release_netlock();
 	}
+	release_netlock();
 
 	fprintf(stderr, "background thread crashed\n");
 	acquire_writelock(&lock);

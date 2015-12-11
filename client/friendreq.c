@@ -40,12 +40,15 @@ int send_friendreq(struct server_connection *sc, struct account *acc) {
 	uint8_t uid[32];
 	sha256((uint8_t*)uname, strlen(uname) + 1, uid);
 
+	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
 	if(send_pkey_req(sc, uid) != 0) {
 		goto err;
 	}
+	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
 
 	set_mode(2);
 
+	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
 	pthread_mutex_lock(&bg_lock);
 	while(pkey_resp == NULL && get_mode() == 2) {
 		pthread_cond_wait(&bg_wait, &bg_lock);
@@ -53,8 +56,10 @@ int send_friendreq(struct server_connection *sc, struct account *acc) {
 	if(get_mode() == -1) {
 		goto err;
 	}
+	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
 	set_mode(0);
 	pthread_mutex_unlock(&bg_lock);
+	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
 
 	if(pkey_resp->length < 0x21) {
 		fprintf(stderr, "server returned invalid message\n");
@@ -135,22 +140,31 @@ static int verify_pkey(char *target, uint8_t *pkey_bin, uint64_t pkey_len) {
 }
 
 static int send_pkey_req(struct server_connection *sc, uint8_t target[32]) {
+	int ret = -1;
+	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
+	if(acquire_netlock() != 0) return -1;
+	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
 	uint8_t *message = malloc(1 + 0x20);
 	if(message == NULL) {
 		fprintf(stderr, "failed to allocate memory\n");
-		return -1;
+		goto err;
 	}
 
 	message[0] = 1;
 	memcpy(&message[1], target, 0x20);
 
+	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
 	if(send_message(sc->ch, &sc->keys, message, 0x21) != 0) {
 		fprintf(stderr, "failed to send pkey request\n");
-		return -1;
+		goto err;
 	}
+	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
 
 	free(message);
-	return 0;
+	ret = 0;
+err:
+	release_netlock();
+	return ret;
 }
 
 static int send_friendreq_message(struct server_connection *sc,
@@ -245,10 +259,12 @@ static int send_friendreq_message(struct server_connection *sc,
 		goto err;
 	}
 
+	if(acquire_netlock() != 0) goto err;
 	if(send_message(sc->ch, &sc->keys, reqbody, reqlen) != 0) {
 		fprintf(stderr, "failed to send message\n");
 		goto err;
 	}
+	release_netlock();
 
 	ret = 0;
 
