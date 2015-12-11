@@ -163,8 +163,8 @@ uint64_t notif_bin_len(struct notif *n) {
 	case 2:
 		len += 0x08;
 		len += 0x08;
-		len += n->fr->u_len;
-		len += n->fr->k_len;
+		len += n->freq->u_len;
+		len += n->freq->k_len;
 		break;
 	case 3:
 		len += 0x20;

@@ -123,7 +123,7 @@ void ch_cleanup_end_handler(void *_arg) {
 	struct ch_manager *arg = (struct ch_manager *)_arg;
 
 	/* give them a chance to receive any left over messages */
-	sleep(5);
+	sleep(1);
 
 	end_handler(arg->handler);
 	pthread_join(arg->thread, NULL);
