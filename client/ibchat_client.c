@@ -130,32 +130,27 @@ static int set_umask() {
 }
 
 static int open_logfile() {
-	if(debug_mode) {
-		/* logfile should be stderr */
-		lgf = stderr;
-	} else {
-		/* lgf should point to the .ibchat/ibchat.log */
-		char *pathend = "/ibchat.log";
-		size_t len = strlen(ROOT_DIR) + strlen(pathend) + 1;
-		char *path = malloc(len);
-		if(path == NULL) {
-			fprintf(stderr, "failed to allocate memory\n");
-			return -1;
-		}
-		strcpy(path, ROOT_DIR);
-		strcat(path, pathend);
+	/* lgf should point to the .ibchat/ibchat.log */
+	char *pathend = "/ibchat.log";
+	size_t len = strlen(ROOT_DIR) + strlen(pathend) + 1;
+	char *path = malloc(len);
+	if(path == NULL) {
+		fprintf(stderr, "failed to allocate memory\n");
+		return -1;
+	}
+	strcpy(path, ROOT_DIR);
+	strcat(path, pathend);
 
-		lgf = fopen(path, "a");
-		if(lgf == NULL) {
-			fprintf(stderr, "failed to open log file\n");
-			return -1;
-		}
+	lgf = fopen(path, "a");
+	if(lgf == NULL) {
+		fprintf(stderr, "failed to open log file\n");
+		return -1;
 	}
 	return 0;
 }
 
 static int close_logfile() {
-	if(!debug_mode) fclose(lgf);
+	fclose(lgf);
 	return 0;
 }
 
