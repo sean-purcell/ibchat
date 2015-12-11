@@ -20,6 +20,7 @@
 #include "friendreq.h"
 #include "uname.h"
 #include "bg_manager.h"
+#include "log.h"
 
 static int send_pkey_req(struct server_connection *sc, uint8_t target[32]);
 static int send_friendreq_message(struct server_connection *sc, struct account *acc, uint8_t target[32], uint8_t *pkey, uint64_t pkeylen);
@@ -40,15 +41,15 @@ int send_friendreq(struct server_connection *sc, struct account *acc) {
 	uint8_t uid[32];
 	sha256((uint8_t*)uname, strlen(uname) + 1, uid);
 
-	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
+	LOGLINE();
 	if(send_pkey_req(sc, uid) != 0) {
 		goto err;
 	}
-	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
+	LOGLINE();
 
 	set_mode(2);
 
-	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
+	LOGLINE();
 	pthread_mutex_lock(&bg_lock);
 	while(pkey_resp == NULL && get_mode() == 2) {
 		pthread_cond_wait(&bg_wait, &bg_lock);
@@ -56,10 +57,10 @@ int send_friendreq(struct server_connection *sc, struct account *acc) {
 	if(get_mode() == -1) {
 		goto err;
 	}
-	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
+	LOGLINE();
 	set_mode(0);
 	pthread_mutex_unlock(&bg_lock);
-	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
+	LOGLINE();
 
 	if(pkey_resp->length < 0x21) {
 		fprintf(stderr, "server returned invalid message\n");
@@ -141,9 +142,9 @@ static int verify_pkey(char *target, uint8_t *pkey_bin, uint64_t pkey_len) {
 
 static int send_pkey_req(struct server_connection *sc, uint8_t target[32]) {
 	int ret = -1;
-	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
+	LOGLINE();
 	if(acquire_netlock() != 0) return -1;
-	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
+	LOGLINE();
 	uint8_t *message = malloc(1 + 0x20);
 	if(message == NULL) {
 		fprintf(stderr, "failed to allocate memory\n");
@@ -153,12 +154,12 @@ static int send_pkey_req(struct server_connection *sc, uint8_t target[32]) {
 	message[0] = 1;
 	memcpy(&message[1], target, 0x20);
 
-	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
+	LOGLINE();
 	if(send_message(sc->ch, &sc->keys, message, 0x21) != 0) {
 		fprintf(stderr, "failed to send pkey request\n");
 		goto err;
 	}
-	fprintf(lgf, "%s:%d\n", __FILE__, __LINE__);
+	LOGLINE();
 
 	free(message);
 	ret = 0;
@@ -302,7 +303,7 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 	uint64_t db_len = decbe64(&payload[9]);
 
 	if(kb_len + db_len + 17 >= p_len) {
-		fprintf(lgf, "invalid block lengths\n");
+		LOGLINE();
 		goto inv;
 	}
 
@@ -314,7 +315,7 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 
 	/* decrypt the message */
 	if(rsa_oaep_decrypt(&rkey, &payload[0x11], kb_len, keys, 64) != 0) {
-		fprintf(lgf, "invalid enc block\n");
+		LOGLINE();
 		goto inv;
 	}
 
@@ -322,7 +323,7 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 
 	hmac_sha256(hmac, 32, data, db_len - 32, mac);
 	if(memcmp_ct(mac, &data[db_len-32], 32) != 0) {
-		fprintf(lgf, "invalid mac\n");
+		LOGLINE();
 		goto inv;
 	}
 
@@ -355,7 +356,7 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 
 	/* now verify the message */
 	if(rsa_wire2pubkey(freq->pkey, freq->k_len, &pkey) != 0) {
-		fprintf(lgf, "failed to expand public key\n");
+		LOGLINE();
 		goto inv;
 	}
 
@@ -392,7 +393,7 @@ err:
 	return ret;
 inv:
 /* invalid message reject it but do not error */
-	fprintf(lgf, "invalid friendreq from %s\n", s_hex);
+	LOGLINE();
 	goto end;
 }
 

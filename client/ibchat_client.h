@@ -8,6 +8,7 @@ extern char *PORT;
 extern int userfile_dirty;
 extern int debug_mode;
 
+void LOG(char *format, ...);
 char *file_path(uint8_t id[32]);
 
 #endif

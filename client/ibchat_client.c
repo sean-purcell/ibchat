@@ -37,6 +37,13 @@ int init(int argc, char **argv) {
 	return 0;
 }
 
+static int close_logfile();
+int deinit() {
+	if(close_logfile() != 0) return 1;
+
+	return 0;
+}
+
 static int process_opts(int argc, char **argv) {
 	struct option long_opts[] = {
 		{ "debug", no_argument, 0, 'd' },
@@ -144,6 +151,11 @@ static int open_logfile() {
 			return -1;
 		}
 	}
+	return 0;
+}
+
+static int close_logfile() {
+	if(!debug_mode) fclose(lgf);
 	return 0;
 }
 

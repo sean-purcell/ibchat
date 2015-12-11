@@ -42,6 +42,7 @@ FILE *lgf; /* logfile */
 static char keysig[65];
 
 int init(int argc, char **argv);
+int deinit();
 int select_profile();
 int handle_user();
 
@@ -67,6 +68,8 @@ int main(int argc, char **argv) {
 	}
 
 	/* TODO: disconnect and clean up */
+
+	deinit();
 
 	return 0;
 }
