@@ -41,15 +41,12 @@ int send_friendreq(struct server_connection *sc, struct account *acc) {
 	uint8_t uid[32];
 	sha256((uint8_t*)uname, strlen(uname) + 1, uid);
 
-	LOGLINE();
 	if(send_pkey_req(sc, uid) != 0) {
 		goto err;
 	}
-	LOGLINE();
 
 	set_mode(2);
 
-	LOGLINE();
 	pthread_mutex_lock(&bg_lock);
 	while(pkey_resp == NULL && get_mode() == 2) {
 		pthread_cond_wait(&bg_wait, &bg_lock);
@@ -57,10 +54,8 @@ int send_friendreq(struct server_connection *sc, struct account *acc) {
 	if(get_mode() == -1) {
 		goto err;
 	}
-	LOGLINE();
 	set_mode(0);
 	pthread_mutex_unlock(&bg_lock);
-	LOGLINE();
 
 	if(pkey_resp->length < 0x21) {
 		fprintf(stderr, "server returned invalid message\n");
@@ -105,6 +100,8 @@ int send_friendreq(struct server_connection *sc, struct account *acc) {
 		goto err;
 	}
 
+	LOG("friend request send to %s", uname);
+
 	return 0;
 
 	goto end;
@@ -142,9 +139,7 @@ static int verify_pkey(char *target, uint8_t *pkey_bin, uint64_t pkey_len) {
 
 static int send_pkey_req(struct server_connection *sc, uint8_t target[32]) {
 	int ret = -1;
-	LOGLINE();
 	if(acquire_netlock() != 0) return -1;
-	LOGLINE();
 	uint8_t *message = malloc(1 + 0x20);
 	if(message == NULL) {
 		fprintf(stderr, "failed to allocate memory\n");
@@ -154,12 +149,10 @@ static int send_pkey_req(struct server_connection *sc, uint8_t target[32]) {
 	message[0] = 1;
 	memcpy(&message[1], target, 0x20);
 
-	LOGLINE();
 	if(send_message(sc->ch, &sc->keys, message, 0x21) != 0) {
 		fprintf(stderr, "failed to send pkey request\n");
 		goto err;
 	}
-	LOGLINE();
 
 	free(message);
 	ret = 0;
@@ -254,18 +247,12 @@ static int send_friendreq_message(struct server_connection *sc,
 		fprintf(stderr, "failed to expand private key\n");
 		goto err;
 	}
-	LOG("sig offset: %d, sig area len: %d, sig len: %d", ptr - &reqbody[0x29], reqlen - siglen - 0x29, siglen);
 	if(rsa_pss_sign(&sig_key, &reqbody[0x29], reqlen - siglen - 0x29,
 		ptr, siglen) != 0) {
 		fprintf(stderr, "failed to sign\n");
 		goto err;
 	}
 	ptr += siglen;
-
-	uint8_t ABCDEF[32];
-
-	sha256(&reqbody[0x29], reqlen- 0x29, ABCDEF);
-	LOG("HASH %x", decbe64(ABCDEF));
 
 	if(ptr - reqbody != reqlen) {
 		fprintf(stderr, "invalid payload length\n");
@@ -315,7 +302,6 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 	uint64_t db_len = decbe64(&payload[9]);
 
 	if(kb_len + db_len + 17 >= p_len) {
-		LOGLINE();
 		goto inv;
 	}
 
@@ -327,7 +313,6 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 
 	/* decrypt the message */
 	if(rsa_oaep_decrypt(&rkey, &payload[0x11], kb_len, keys, 64) != 0) {
-		LOGLINE();
 		goto inv;
 	}
 
@@ -335,7 +320,6 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 
 	hmac_sha256(hmac, 32, data, db_len - 32, mac);
 	if(memcmp_ct(mac, &data[db_len-32], 32) != 0) {
-		LOGLINE();
 		goto inv;
 	}
 
@@ -365,48 +349,34 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 	if(p_len != kb_len + db_len + 17 + siglen) {
 		LOG("actual len: %d, expected len: %d", p_len,
 			kb_len + db_len + 17 + siglen);
-	LOGLINE();
 		goto inv;
 	}
 
 	/* now verify the message */
 	if(rsa_wire2pubkey(freq->pkey, freq->k_len, &pkey) != 0) {
-		LOGLINE();
 		goto inv;
 	}
 
 	/* reencrypt the payload so we can verify the sig */
-	LOGLINE();
 	chacha_enc(symm, 32, 0, data, data, db_len - 32);
-	LOGLINE();
-	LOG("sig offset: %d, sig area len: %d, sig len: %d", p_len - siglen, p_len - siglen, siglen);
 	int valid = 0;
 	if(rsa_pss_verify(&pkey, &payload[p_len-siglen], siglen, payload,
 		p_len-siglen, &valid) != 0) {
-	LOGLINE();
 		goto inv;
 	}
 
-	uint8_t ABCDEF[32];
-
-	sha256(payload, p_len, ABCDEF);
-	LOG("HASH %x", decbe64(ABCDEF));
 	if(!valid) {
 		LOG("signature invalid");
-	LOGLINE();
 		goto inv;
 	}
 
-	LOGLINE();
 	/* everything is valid, place it in the queue */
 	struct notif *n = malloc(sizeof(struct notif));
-	LOGLINE();
 	if(n == NULL) {
 		fprintf(stderr, "failed to allocate memory\n");
 		goto err;
 	}
 
-	LOGLINE();
 
 	n->type = 2;
 	n->freq = freq;
@@ -429,7 +399,6 @@ err:
 	return ret;
 inv:
 /* invalid message reject it but do not error */
-	LOGLINE();
 	goto end;
 }
 
