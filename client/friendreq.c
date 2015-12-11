@@ -262,6 +262,11 @@ static int send_friendreq_message(struct server_connection *sc,
 	}
 	ptr += siglen;
 
+	uint8_t ABCDEF[32];
+
+	sha256(&reqbody[0x29], reqlen- 0x29, ABCDEF);
+	LOG("HASH %x", decbe64(ABCDEF));
+
 	if(ptr - reqbody != reqlen) {
 		fprintf(stderr, "invalid payload length\n");
 		goto err;
@@ -370,6 +375,10 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 		goto inv;
 	}
 
+	/* reencrypt the payload so we can verify the sig */
+	LOGLINE();
+	chacha_enc(symm, 32, 0, data, data, db_len - 32);
+	LOGLINE();
 	LOG("sig offset: %d, sig area len: %d, sig len: %d", p_len - siglen, p_len - siglen, siglen);
 	int valid = 0;
 	if(rsa_pss_verify(&pkey, &payload[p_len-siglen], siglen, payload,
@@ -377,23 +386,36 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 	LOGLINE();
 		goto inv;
 	}
+
+	uint8_t ABCDEF[32];
+
+	sha256(payload, p_len, ABCDEF);
+	LOG("HASH %x", decbe64(ABCDEF));
 	if(!valid) {
 		LOG("signature invalid");
 	LOGLINE();
 		goto inv;
 	}
 
+	LOGLINE();
 	/* everything is valid, place it in the queue */
 	struct notif *n = malloc(sizeof(struct notif));
+	LOGLINE();
 	if(n == NULL) {
 		fprintf(stderr, "failed to allocate memory\n");
 		goto err;
 	}
 
+	LOGLINE();
+
 	n->type = 2;
 	n->freq = freq;
 
+	LOGLINE();
+
 	insert_notif(n);
+
+	LOGLINE();
 
 end:
 	ret = 0;
