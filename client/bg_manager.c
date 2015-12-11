@@ -50,7 +50,7 @@ int add_umessage(struct message *m) {
 	char s_hex[65];
 	to_hex(sender, 0x20, s_hex);
 
-	LOG("message from %s of length %llu\n", s_hex, m->length);
+	LOG("message from %s of length %llu", s_hex, m->length);
 
 	uint64_t p_len = decbe64(&m->message[0x21]);
 

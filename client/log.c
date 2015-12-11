@@ -26,6 +26,7 @@ void LOG(char *format, ...) {
 	va_list args;
 	va_start(args, format);
 	vfprintf(lgf, format, args);
+	fprintf(lgf, "\n");
 	va_end(args);
 	pthread_mutex_unlock(&log_lock);
 }
