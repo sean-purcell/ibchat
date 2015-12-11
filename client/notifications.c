@@ -15,6 +15,7 @@
 #include "ibchat_client.h"
 #include "notifications.h"
 #include "datafile.h"
+#include "log.h"
 
 static int nf_p_fill(void *_arg, uint8_t *ptr) {
 	return 0;
@@ -74,14 +75,19 @@ int insert_notif(struct notif *n) {
 	int ret = 0;
 	acquire_writelock(&lock);
 
+LOGLINE();
 	struct notif **cur = &notifs;
 	while(*cur) {
 		cur = &(*cur)->next;
+LOGLINE();
 	}
+LOGLINE();
 
 	*cur = n;
 
+LOGLINE();
 	ret = write_notiffile(acc, notifs);
+LOGLINE();
 	release_writelock(&lock);
 	return ret;
 }
@@ -130,6 +136,7 @@ int write_notiffile(struct account *acc, struct notif *notifs) {
 	if(path == NULL) {
 		return -1;
 	}
+	LOG("writing notiffile: %s", path);
 	ret = write_datafile(path, acc, notifs, &nf_format);
 	free(path);
 	return ret;

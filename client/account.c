@@ -6,6 +6,7 @@
 
 #include <ibcrypt/zfree.h>
 
+#include <libibur/util.h>
 #include <libibur/endian.h>
 
 #include "../util/line_prompt.h"
@@ -16,6 +17,7 @@
 #include "ibchat_client.h"
 #include "friends.h"
 #include "notifications.h"
+#include "log.h"
 
 int pick_account(struct profile *prof, struct account **acc) {
 	if(prof->server_accounts == NULL) {
@@ -118,6 +120,11 @@ uint8_t *account_write_bin(struct account *acc, uint8_t *ptr) {
 	memcpy(ptr, acc->n_symm, 0x20); ptr += 0x20;
 	memcpy(ptr, acc->n_hmac, 0x20); ptr += 0x20;
 
+	// FIXME: REMOVE
+	char buf[10000];
+	to_hex(ptr - account_bin_size(acc), account_bin_size(acc), buf);
+	LOG("account data: %s", buf);
+
 	return ptr;
 }
 
@@ -167,6 +174,11 @@ uint8_t *account_parse_bin(struct account **acc, uint8_t *ptr) {
 
 	ap->friends = NULL;
 	ap->next = NULL;
+
+	// FIXME: REMOVE
+	char buf[10000];
+	to_hex(ptr - account_bin_size(ap), account_bin_size(ap), buf);
+	LOG("account data: %s", buf);
 
 	*acc = ap;
 	return ptr;
