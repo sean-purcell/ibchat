@@ -178,7 +178,7 @@ static int send_friendreq_message(struct server_connection *sc,
 
 	uint64_t reqlen = 0;
 	reqlen += 0x29; /* message type and destination/length */
-	reqlen += 9; /* friend message prefix */
+	reqlen += 0x11; /* friend message prefix */
 	reqlen += encblen; /* encrypted block */
 	reqlen += 0x10; /* payload prefix */
 	reqlen += acc->u_len; /* username */
@@ -254,9 +254,16 @@ static int send_friendreq_message(struct server_connection *sc,
 		fprintf(stderr, "failed to expand private key\n");
 		goto err;
 	}
-	if(rsa_pss_sign(&sig_key, reqbody, reqlen - siglen,
+	LOG("sig offset: %d, sig area len: %d, sig len: %d", ptr - &reqbody[0x29], reqlen - siglen - 0x29, siglen);
+	if(rsa_pss_sign(&sig_key, &reqbody[0x29], reqlen - siglen - 0x29,
 		ptr, siglen) != 0) {
 		fprintf(stderr, "failed to sign\n");
+		goto err;
+	}
+	ptr += siglen;
+
+	if(ptr - reqbody != reqlen) {
+		fprintf(stderr, "invalid payload length\n");
 		goto err;
 	}
 
@@ -351,6 +358,9 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 	uint64_t siglen = (decbe64(freq->pkey) + 7) / 8;
 
 	if(p_len != kb_len + db_len + 17 + siglen) {
+		LOG("actual len: %d, expected len: %d", p_len,
+			kb_len + db_len + 17 + siglen);
+	LOGLINE();
 		goto inv;
 	}
 
@@ -360,12 +370,16 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 		goto inv;
 	}
 
+	LOG("sig offset: %d, sig area len: %d, sig len: %d", p_len - siglen, p_len - siglen, siglen);
 	int valid = 0;
 	if(rsa_pss_verify(&pkey, &payload[p_len-siglen], siglen, payload,
 		p_len-siglen, &valid) != 0) {
+	LOGLINE();
 		goto inv;
 	}
 	if(!valid) {
+		LOG("signature invalid");
+	LOGLINE();
 		goto inv;
 	}
 
