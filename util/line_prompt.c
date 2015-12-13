@@ -130,8 +130,10 @@ start:;
 		goto inv;
 	}
 
+	free(resp);
 	return res;
 inv:
+	free(resp);
 	printf("invalid response, try again\n");
 	goto start;
 }
@@ -160,8 +162,10 @@ uint64_t num_prompt_no_retry(char *prompt, uint64_t min, uint64_t max) {
 		goto inv;
 	}
 
+	free(resp);
 	return res;
 inv:
+	free(resp);
 	return ULLONG_MAX - 1;
 }
 
