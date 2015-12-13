@@ -381,6 +381,8 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 	n->type = 2;
 	n->freq = freq;
 
+	n->next = NULL;
+
 	LOGLINE();
 
 	insert_notif(n);
