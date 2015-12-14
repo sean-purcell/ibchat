@@ -75,19 +75,14 @@ int insert_notif(struct notif *n) {
 	int ret = 0;
 	acquire_writelock(&lock);
 
-LOGLINE();
 	struct notif **cur = &notifs;
 	while(*cur) {
 		cur = &(*cur)->next;
-LOGLINE();
 	}
-LOGLINE();
 
 	*cur = n;
 
-LOGLINE();
 	ret = write_notiffile(acc, notifs);
-LOGLINE();
 	release_writelock(&lock);
 	return ret;
 }
@@ -148,7 +143,8 @@ int read_notiffile(struct account *acc, struct notif **notifs) {
 	if(path == NULL) {
 		return -1;
 	}
-	ret = read_datafile(path, acc, (void**)notifs, &nf_format);
+	LOG("reading notiffile: %s", path);
+	ret = read_datafile(path, acc, (void **) notifs, &nf_format);
 	free(path);
 	return ret;
 }
