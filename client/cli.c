@@ -116,6 +116,12 @@ int select_profile() {
 			fprintf(stderr, "failed to read friend file\n");
 			return 1;
 		}
+
+		/* load the notiffile */
+		if(read_notiffile(acc, &notifs) != 0) {
+			fprintf(stderr, "failed to read notiffs\n");
+			return 1;
+		}
 	}
 
 	return 0;

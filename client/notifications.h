@@ -31,6 +31,7 @@ int insert_notif(struct notif *n);
 
 int init_notiffile(struct account *acc);
 int write_notiffile(struct account *acc, struct notif *notifs);
+int read_notiffile(struct account *acc, struct notif **notifs);
 
 uint64_t notif_bin_len(struct notif *n);
 uint8_t *notif_bin_write(struct notif *n, uint8_t *ptr);
