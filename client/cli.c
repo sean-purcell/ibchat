@@ -225,6 +225,11 @@ int handler_select() {
 			stop = 1;
 		}
 		break;
+	case 2:
+		if(view_notifs(acc) != 0) {
+			stop = 1;
+		}
+		break;
 	case 3:
 		if(send_friendreq(&sc, acc) != 0) {
 			stop = 1;

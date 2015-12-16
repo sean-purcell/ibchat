@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <stddef.h>
+#include <limits.h>
 
 #include <sys/stat.h>
 
@@ -11,11 +12,14 @@
 
 #include <libibur/endian.h>
 
+#include "../util/line_prompt.h"
+
 #include "cli.h"
 #include "ibchat_client.h"
 #include "notifications.h"
 #include "datafile.h"
 #include "log.h"
+#include "friendreq.h"
 
 static int nf_p_fill(void *_arg, uint8_t *ptr) {
 	return 0;
@@ -69,6 +73,85 @@ int notiflist_len(struct notif *n) {
 	release_readlock(&lock);
 
 	return num;
+}
+
+void notiflist_free(struct notif *n) {	
+	struct notif *cur = n;
+	while(cur) {
+		struct notif *next = cur->next;
+		notif_free(cur);
+		cur = next;
+	}
+}
+
+void notif_free(struct notif *n) {
+	switch(n->type) {
+	case 1:
+	case 3:
+		break;
+	case 2:
+		free_friendreq(n->freq);
+		break;
+	}
+	free(n);
+}
+
+void print_notif(struct notif *n, int num);
+int view_notifs(struct account *acc) {
+	struct notif *n = notifs;
+	int ret = -1;
+	acquire_writelock(&lock);
+	int nnum = 0;
+	struct notif *cur = n;
+	while(cur) {
+		print_notif(cur, nnum+1);
+		nnum++;
+		cur = cur->next;
+	}
+	printf("%4d: clear all\n", 0);
+
+	int sel = num_prompt("selection", 0, nnum);
+	if(sel == ULLONG_MAX) {
+		goto err;
+	}
+
+	if(sel > 0) {
+		cur = n;
+		while(sel - 1) {
+			cur = cur->next;
+			sel--;
+		}
+		// TODO: operate on notif
+	} else {
+		/* clear notifications */
+		notiflist_free(notifs);
+		notifs = NULL;
+		ret = write_notiffile(acc, NULL);
+		goto end;
+	}
+
+	ret = 0;
+end:
+err:
+	release_writelock(&lock);
+	return ret;
+}
+
+void print_notif(struct notif *n, int num) {
+	switch(n->type) {
+	case 1:
+		printf("%4d: %llu unread messages from %s\n",
+			num, n->nunread, n->fr->uname);
+		break;
+	case 2:
+		printf("%4d: friend request from %s\n",
+			num, n->freq->uname);
+		break;
+	case 3:
+		printf("%d: %s accepted your friend request\n",
+			num, n->fr->uname);
+		break;
+	}
 }
 
 int insert_notif(struct notif *n) {
