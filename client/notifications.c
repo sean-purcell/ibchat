@@ -97,6 +97,7 @@ void notif_free(struct notif *n) {
 }
 
 void print_notif(struct notif *n, int num);
+int notif_selected(struct account *acc, struct notif *n);
 int view_notifs(struct account *acc) {
 	struct notif *n = notifs;
 	int ret = -1;
@@ -121,20 +122,42 @@ int view_notifs(struct account *acc) {
 			cur = cur->next;
 			sel--;
 		}
-		// TODO: operate on notif
+		ret = notif_selected(acc, cur);
 	} else {
 		/* clear notifications */
 		notiflist_free(notifs);
 		notifs = NULL;
 		ret = write_notiffile(acc, NULL);
-		goto end;
 	}
-
-	ret = 0;
-end:
 err:
 	release_writelock(&lock);
 	return ret;
+}
+
+int notif_selected(struct account *acc, struct notif *n) {
+	/* remove the notification and rewrite */
+	{
+		struct notif **list = &notifs;
+		while(*list != n) {
+			list = &((*list)->next);
+		}
+		*list = n->next;
+
+		if(write_notiffile(acc, notifs) != 0) {
+			return 1;
+		}
+	}
+	switch(n->type) {
+	case 1:
+	case 3:
+		/* open conversation with said person */
+		break;
+	case 2:
+		/* prompt for response to friend request */
+		break;
+	}
+
+	return 0;
 }
 
 void print_notif(struct notif *n, int num) {
