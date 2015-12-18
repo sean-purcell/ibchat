@@ -19,6 +19,7 @@
 #include "notifications.h"
 #include "datafile.h"
 #include "log.h"
+#include "conversation.h"
 #include "friendreq.h"
 
 static int nf_p_fill(void *_arg, uint8_t *ptr) {
@@ -151,9 +152,11 @@ int notif_selected(struct account *acc, struct notif *n) {
 	case 1:
 	case 3:
 		/* open conversation with said person */
+		return start_conversation(n->fr);
 		break;
 	case 2:
 		/* prompt for response to friend request */
+		return friendreq_response(n->freq);
 		break;
 	}
 

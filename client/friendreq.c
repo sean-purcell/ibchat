@@ -405,6 +405,35 @@ inv:
 }
 
 
+int friendreq_response(struct friendreq *freq) {
+	uint8_t hash[32];
+	char sig[65];
+	sha256(freq->pkey, freq->k_len, hash);
+	to_hex(hash, 32, sig);
+	printf("friend request from %s\n"
+		"key signature: %s\n"
+		"trust this key? [y/n] ",
+		freq->uname, sig);
+	LOG("friend request: %s %s", freq->uname, sig);
+	int res = yn_prompt();
+	if(res == -1) {
+		fprintf(stderr, "failed to get response\n");
+	}
+
+	if(res == 0) {
+		printf("friend request rejected\n");
+		return 0;
+	}
+
+	/* send the message */
+	return friendreq_send_response(freq);
+}
+
+int friendreq_send_response(struct friendreq *freq) {
+	LOG("NOT IMPLEMENTED\n");
+	return -1;
+}
+
 void free_friendreq(struct friendreq *freq) {
 	if(!freq) return;
 	zfree(freq->uname, freq->u_len);

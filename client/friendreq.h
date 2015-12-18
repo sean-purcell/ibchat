@@ -21,5 +21,8 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len);
 int send_friendreq(struct server_connection *sc, struct account *acc);
 void free_friendreq(struct friendreq *freq);
 
+int friendreq_response(struct friendreq *freq);
+int friendreq_send_response(struct friendreq *freq);
+
 #endif
 
