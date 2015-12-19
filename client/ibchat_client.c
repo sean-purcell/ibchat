@@ -11,10 +11,10 @@
 #include <libibur/util.h>
 
 #include "../util/defaults.h"
+#include "../util/log.h"
 
 #include "ibchat_client.h"
 #include "cli.h"
-#include "log.h"
 
 char *ROOT_DIR = "~/.ibchat/";
 
@@ -151,6 +151,7 @@ static int open_logfile() {
 	}
 
 	set_logfile(lgf);
+	set_debug_mode(debug_mode);
 
 	return 0;
 }

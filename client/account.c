@@ -10,6 +10,7 @@
 #include <libibur/endian.h>
 
 #include "../util/line_prompt.h"
+#include "../util/log.h"
 
 #include "account.h"
 #include "profile.h"
@@ -17,7 +18,6 @@
 #include "ibchat_client.h"
 #include "friends.h"
 #include "notifications.h"
-#include "log.h"
 
 int pick_account(struct profile *prof, struct account **acc) {
 	if(prof->server_accounts == NULL) {

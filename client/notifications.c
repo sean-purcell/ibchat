@@ -13,12 +13,12 @@
 #include <libibur/endian.h>
 
 #include "../util/line_prompt.h"
+#include "../util/log.h"
 
 #include "cli.h"
 #include "ibchat_client.h"
 #include "notifications.h"
 #include "datafile.h"
-#include "log.h"
 #include "conversation.h"
 #include "friendreq.h"
 

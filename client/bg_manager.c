@@ -11,11 +11,12 @@
 #include <libibur/util.h>
 #include <libibur/endian.h>
 
+#include "../util/log.h"
+
 #include "bg_manager.h"
 #include "login_server.h"
 #include "cli.h"
 #include "friendreq.h"
-#include "log.h"
 
 pthread_t bg_manager;
 

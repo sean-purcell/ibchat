@@ -8,6 +8,7 @@
 } while(0)
 
 void set_logfile(FILE *f);
+void set_debug_mode(int dbm);
 
 void LOG(char *format, ...);
 void ERR(char *format, ...);

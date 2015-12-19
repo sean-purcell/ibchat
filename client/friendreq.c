@@ -15,12 +15,12 @@
 
 #include "../util/line_prompt.h"
 #include "../util/lock.h"
+#include "../util/log.h"
 
 #include "cli.h"
 #include "friendreq.h"
 #include "uname.h"
 #include "bg_manager.h"
-#include "log.h"
 
 static int send_pkey_req(struct server_connection *sc, uint8_t target[32]);
 static int send_friendreq_message(struct server_connection *sc, struct account *acc, uint8_t target[32], uint8_t *pkey, uint64_t pkeylen);

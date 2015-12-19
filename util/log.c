@@ -4,16 +4,18 @@
 
 #include <sys/time.h>
 
-#include "cli.h"
-#include "ibchat_client.h"
-
 static pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
 static char time_str[30];
 
 static FILE *lgf = NULL;
+static int debug_mode = 0;
 
 void set_logfile(FILE *f) {
 	lgf = f;
+}
+
+void set_debug_mode(int dbm) {
+	debug_mode = dbm;
 }
 
 static void fmt_time() {
