@@ -8,8 +8,9 @@
 #include "ibchat_client.h"
 
 static pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
+static char time_str[30];
 
-static void print_time() {
+static void fmt_time() {
 	char time[20];
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
@@ -18,27 +19,42 @@ static void print_time() {
 	tm_info = localtime(&tv.tv_sec);
 
 	strftime(time, 26, "%Y-%m-%d %H:%M:%S", tm_info);
-	fprintf(lgf, "%s:%.3d - ", time, tv.tv_usec / 1000);
-	if(debug_mode) {
-		fprintf(stderr, "%s:%.3d - ", time, tv.tv_usec / 1000);
+	sprintf(time_str, "%s:%.3d - ", time, tv.tv_usec / 1000);
+}
+
+static void write_to_file(FILE *f, char *format, va_list args) {
+	va_list arg_copy;
+	va_copy(arg_copy, args);
+	fputs(time_str, f);
+	vfprintf(f, format, arg_copy);
+	fputs("\n", f);
+	fflush(f);
+	va_end(arg_copy);
+}
+
+static void write_message(int log, int err, char *format, va_list args) {
+	pthread_mutex_lock(&log_lock);
+	fmt_time();
+	if(log) {
+		write_to_file(lgf, format, args);
 	}
+	if(err) {
+		write_to_file(stderr, format, args);
+	}
+	pthread_mutex_unlock(&log_lock);
 }
 
 void LOG(char *format, ...) {
-	pthread_mutex_lock(&log_lock);
-	print_time();
 	va_list args;
 	va_start(args, format);
-	vfprintf(lgf, format, args);
-	fprintf(lgf, "\n");
-	fflush(lgf);
+	write_message(1, debug_mode, format, args);
 	va_end(args);
-	if(debug_mode) {
-		va_start(args, format);
-		vfprintf(stderr, format, args);
-		fprintf(stderr, "\n");
-		va_end(args);
-	}
-	pthread_mutex_unlock(&log_lock);
+}
+
+void ERR(char *format, ...) {
+	va_list args;
+	va_start(args, format);
+	write_message(1, 1, format, args);
+	va_end(args);
 }
 
