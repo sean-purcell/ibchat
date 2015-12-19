@@ -14,6 +14,7 @@
 
 #include "ibchat_client.h"
 #include "cli.h"
+#include "log.h"
 
 char *ROOT_DIR = "~/.ibchat/";
 
@@ -21,6 +22,8 @@ char *ROOT_DIR = "~/.ibchat/";
 int userfile_dirty = 0;
 
 int debug_mode = 0;
+
+static FILE *lgf;
 
 static int process_opts(int argc, char **argv);
 static int expand_root_dir();
@@ -146,6 +149,9 @@ static int open_logfile() {
 		fprintf(stderr, "failed to open log file\n");
 		return -1;
 	}
+
+	set_logfile(lgf);
+
 	return 0;
 }
 

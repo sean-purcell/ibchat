@@ -10,6 +10,12 @@
 static pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
 static char time_str[30];
 
+static FILE *lgf = NULL;
+
+void set_logfile(FILE *f) {
+	lgf = f;
+}
+
 static void fmt_time() {
 	char time[20];
 	struct timeval tv;
@@ -23,6 +29,7 @@ static void fmt_time() {
 }
 
 static void write_to_file(FILE *f, char *format, va_list args) {
+	if(f == NULL) return;
 	va_list arg_copy;
 	va_copy(arg_copy, args);
 	fputs(time_str, f);

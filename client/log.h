@@ -7,6 +7,8 @@
 	exit(1);\
 } while(0)
 
+void set_logfile(FILE *f);
+
 void LOG(char *format, ...);
 void ERR(char *format, ...);
 

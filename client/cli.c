@@ -37,8 +37,6 @@ int mode;
 
 int stop;
 
-FILE *lgf; /* logfile */
-
 static char keysig[65];
 
 int init(int argc, char **argv);
