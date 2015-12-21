@@ -26,6 +26,7 @@
 #include "../inet/connect.h"
 #include "../util/line_prompt.h"
 #include "../util/defaults.h"
+#include "../util/log.h"
 
 /* private info */
 RSA_KEY server_key;
@@ -33,6 +34,8 @@ char *password;
 /* ------------ */
 
 RSA_PUBLIC_KEY server_pub_key;
+
+FILE *lgf;
 
 void usage(char *argv0) {
 	fprintf(stderr, "usage: %s [-p port] "
@@ -55,6 +58,7 @@ void signal_stop(int signum);
 
 int load_server_key(char *keyfile, char *password, RSA_KEY *server_key);
 int check_root_dir(char *fname);
+int open_logfile(char *root_dir);
 int server_bind_err(struct sock server_socket);
 
 int handle_connections(int server_socket);
@@ -94,15 +98,19 @@ int chat_server(int argc, char **argv) {
 		goto err2;
 	}
 
+	if(open_logfile(opts.root_dir) != 0) {
+		goto err2;
+	}
+
 	/* load up the database */
 	if(user_db_init(opts.root_dir) != 0) {
-		goto err2;
+		goto err3;
 	}
 
 	/* set up the server */
 	struct sock server_socket = server_bind(opts.port);
 	if(server_bind_err(server_socket) != 0) {
-		goto err2;
+		goto err3;
 	}
 
 	printf("server opened on port %s\n", opts.port);
@@ -112,7 +120,7 @@ int chat_server(int argc, char **argv) {
 	/* TODO: start the manager thread */
 	if(handle_connections(server_socket.fd) != 0) {
 		fprintf(stderr, "handle connections error: %s\n", strerror(errno));
-		goto err3;
+		goto err4;
 	}
 
 	close(server_socket.fd);
@@ -121,8 +129,10 @@ int chat_server(int argc, char **argv) {
 
 	return 0;
 
-err3:
+err4:
 	close(server_socket.fd);
+err3:
+	fclose(lgf);
 err2:
 err1:
 	/* cleanup */
@@ -327,6 +337,33 @@ int check_root_dir(char *fname) {
 			return -1;
 		}
 	}
+	return 0;
+}
+
+int open_logfile(char *root_dir) {
+	/* lgf should point to the .ibchat/ibchat.log */
+	char *pathend = "/ibchat.log";
+	size_t len = strlen(root_dir) + strlen(pathend) + 1;
+	char *path = malloc(len);
+	if(path == NULL) {
+		fprintf(stderr, "failed to allocate memory\n");
+		return -1;
+	}
+	strcpy(path, root_dir);
+	strcat(path, pathend);
+
+	lgf = fopen(path, "a");
+	if(lgf == NULL) {
+		fprintf(stderr, "failed to open log file\n");
+		free(path);
+		return -1;
+	}
+
+	free(path);
+
+	set_logfile(lgf);
+	set_debug_mode(1);
+
 	return 0;
 }
 

@@ -147,8 +147,11 @@ static int open_logfile() {
 	lgf = fopen(path, "a");
 	if(lgf == NULL) {
 		fprintf(stderr, "failed to open log file\n");
+		free(path);
 		return -1;
 	}
+
+	free(path);
 
 	set_logfile(lgf);
 	set_debug_mode(debug_mode);

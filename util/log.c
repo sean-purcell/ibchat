@@ -30,11 +30,11 @@ static void fmt_time() {
 	sprintf(time_str, "%s:%.3d - ", time, tv.tv_usec / 1000);
 }
 
-static void write_to_file(FILE *f, char *format, va_list args) {
+static void write_to_file(FILE *f, int time, char *format, va_list args) {
 	if(f == NULL) return;
 	va_list arg_copy;
 	va_copy(arg_copy, args);
-	fputs(time_str, f);
+	if(time) fputs(time_str, f);
 	vfprintf(f, format, arg_copy);
 	fputs("\n", f);
 	fflush(f);
@@ -45,10 +45,10 @@ static void write_message(int log, int err, char *format, va_list args) {
 	pthread_mutex_lock(&log_lock);
 	fmt_time();
 	if(log) {
-		write_to_file(lgf, format, args);
+		write_to_file(lgf, 1, format, args);
 	}
 	if(err) {
-		write_to_file(stderr, format, args);
+		write_to_file(stderr, 0, format, args);
 	}
 	pthread_mutex_unlock(&log_lock);
 }
