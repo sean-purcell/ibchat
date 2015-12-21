@@ -15,6 +15,7 @@
 #include "../crypto/crypto_layer.h"
 #include "../inet/protocol.h"
 #include "../inet/message.h"
+#include "../util/log.h"
 
 #include "client_handler.h"
 #include "user_db.h"
@@ -82,12 +83,12 @@ static int user_register(uint8_t *uid, RSA_PUBLIC_KEY *pkey, int fd, struct con_
 	char uname[65];
 	to_hex(uid, 32, uname);
 	uname[64] = '\0';
-	printf("%d: registered user %s\n", fd, uname);
+	LOG("%d: registered user %s", fd, uname);
 	return 0;
 }
 
 int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, struct keyset *keys, uint8_t *uid) {
-#define ERR(x) fprintf(stderr, "%d: %s\n", cli_hndl->fd, x)
+#define ERR(x) ERR("%d: %s", cli_hndl->fd, x)
 
 	uint8_t challenge[0x20];
 
@@ -180,9 +181,9 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 
 	if(ret == 2 || ret == 3) {
 		if(ret == 2) {
-			printf("%d: user already logged in\n", cli_hndl->fd);
+			LOG("%d: user already logged in", cli_hndl->fd);
 		} else {
-			printf("%d: user exists with different public key\n", cli_hndl->fd);
+			LOG("%d: user exists with different public key", cli_hndl->fd);
 		}
 		goto err3;
 	}
@@ -191,7 +192,7 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 		ret = user_register(uid, &pb_key, cli_hndl->fd, con_hndl, keys);
 		if(ret != 0) {
 			if(ret == -1) {
-				fprintf(stderr, "%d: failed to register user\n", cli_hndl->fd);
+				ERR("failed to register user");
 			}
 			goto err3;
 		}
@@ -199,7 +200,7 @@ int auth_user(struct client_handler *cli_hndl, struct con_handle *con_hndl, stru
 
 	char buf[65];
 	to_hex(uid, 32, buf);
-	printf("%d: logged in user %s\n", cli_hndl->fd, buf);
+	LOG("%d: logged in user %s", cli_hndl->fd, buf);
 
 	memset(challenge, 0, sizeof(challenge));
 

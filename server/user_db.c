@@ -24,8 +24,7 @@
 #include "chat_server.h"
 
 #include "../util/lock.h"
-
-#define USER_DB_DEBUG
+#include "../util/log.h"
 
 #define TOP_LOAD (0.75)
 #define BOT_LOAD (0.5 / 2)
@@ -148,19 +147,19 @@ static int check_user_dir() {
 	struct stat st = {0};
 	if(stat(USER_DIR, &st) == -1) {
 		if(errno != ENOENT) {
-			fprintf(stderr, "failed to open user directory: %s\n", USER_DIR);
+			ERR("failed to open user directory: %s", USER_DIR);
 			return -1;
 		}
 
 		/* directory doesn't exist, create it */
 		if(mkdir(USER_DIR, 0700) != 0) {
-			fprintf(stderr, "failed to create user directory: %s\n", USER_DIR);
+			ERR("failed to create user directory: %s", USER_DIR);
 			return -1;
 		}
 	} else {
 		/* make sure its a directory */
 		if(!S_ISDIR(st.st_mode)) {
-			fprintf(stderr, "specified user directory is not a directory: %s\n", USER_DIR);
+			ERR("specified user directory is not a directory: %s", USER_DIR);
 			return -1;
 		}
 	}
@@ -169,20 +168,20 @@ static int check_user_dir() {
 
 static int parse_user_file(char *name, struct user *user) {
 #ifdef USER_DB_DEBUG
-#define ERR() do { fprintf(stderr, "invalid user file: %s, line no: %d\n", name, __LINE__);\
+#define INV() do { ERR("invalid user file: %s, line no: %d", name, __LINE__);\
 	goto err; } while(0);
 #else
-#define ERR() do { fprintf(stderr, "invalid user file: %s\n", name);\
+#define INV() do { ERR("invalid user file: %s", name);\
 	goto err; } while(0);
 #endif
 #define READ(f, b, s)                                                          \
         if(fread(b, s, 1, f) != 1) {                                           \
-                ERR();                                                         \
+                INV();                                                         \
         }
 
 	FILE *uf = fopen(name, "rb");
 	if(uf == NULL) {
-		fprintf(stderr, "failed to open user file: %s\n", name);
+		ERR("failed to open user file: %s", name);
 		return 1;
 	}
 
@@ -205,7 +204,7 @@ static int parse_user_file(char *name, struct user *user) {
 
 	READ(uf, magic, 8);
 	if(memcmp(magic, USER_FILE_MAGIC, 8) != 0) {
-		ERR();
+		INV();
 	}
 
 	READ(uf, uid, 0x20);
@@ -217,7 +216,7 @@ static int parse_user_file(char *name, struct user *user) {
 	 * directory but not for the file, however this is likely being
 	 * paranoid */
 	if(memcmp_ct(uid, expected_uid, 0x20) != 0) {
-		ERR();
+		INV();
 	}
 
 	READ(uf, undelivered, 0x20);
@@ -227,7 +226,7 @@ static int parse_user_file(char *name, struct user *user) {
 	uint64_t siglen = (server_pub_key.bits + 7) / 8;
 	sigbuf = malloc(siglen);
 	if(sigbuf == NULL) {
-		ERR();
+		INV();
 	}
 
 	READ(uf, sigbuf, siglen);
@@ -236,17 +235,17 @@ static int parse_user_file(char *name, struct user *user) {
 	 * hasn't been tampered with */
 	int valid = 0;
 	if(rsa_pss_verify(&server_pub_key, sigbuf, siglen, prefix, 0x50, &valid) != 0) {
-		ERR();
+		INV();
 	}
 	if(!valid) {
-		ERR();
+		INV();
 	}
 
 	pkey_size = decbe64(sizebuf);
 
 	buf = malloc(0x50 + siglen + pkey_size);
 	if(buf == NULL) {
-		ERR();
+		INV();
 	}
 
 	uint8_t *pkey_buf = buf + 0x50 + siglen;
@@ -263,14 +262,14 @@ static int parse_user_file(char *name, struct user *user) {
 
 	/* verify again before unpacking public key */
 	if(rsa_pss_verify(&server_pub_key, sigbuf, siglen, buf, 0x50 + siglen + pkey_size, &valid) != 0) {
-		ERR();
+		INV();
 	}
 	if(!valid) {
-		ERR();
+		INV();
 	}
 
 	if(rsa_wire2pubkey(pkey_buf, pkey_size, &pkey) != 0) {
-		ERR();
+		INV();
 	}
 
 	/* public keys can be passed by value */
@@ -290,16 +289,16 @@ exit:
 	/* none of this is sensitive so we don't need to zero it */
 
 	return ret;
-#undef ERR
+#undef INV
 #undef READ
 }
 
 static int write_user_file(struct user *u) {
-#define ERR() do { fprintf(stderr, "failed to write user file: %s\n", name);\
+#define INV() do { ERR("failed to write user file: %s", name);\
 	goto err; } while(0);
 #define WRITE(f, b, s)                                                        \
         if(fwrite(b, s, 1, f) != 1) {                                         \
-                ERR();                                                        \
+                INV();                                                        \
         }
 
 	char name[65];
@@ -309,7 +308,7 @@ static int write_user_file(struct user *u) {
 	size_t upathlen = strlen(USER_DIR);
 	char *path = malloc(upathlen + 64 + 1);
 	if(path == NULL) {
-		fprintf(stderr, "failed to allocate memory for user file: %s\n", name);
+		ERR("failed to allocate memory for user file: %s", name);
 		return 1;
 	}
 
@@ -320,7 +319,7 @@ static int write_user_file(struct user *u) {
 
 	FILE *uf = fopen(path, "wb");
 	if(uf == NULL) {
-		fprintf(stderr, "failed to open user file: %s\n", name);
+		ERR("failed to open user file: %s", name);
 		return 1;
 	}
 
@@ -340,7 +339,7 @@ static int write_user_file(struct user *u) {
 
 	buf = malloc(bufsize);
 	if(buf == NULL) {
-		fprintf(stderr, "failed to allocate memory for user file: %s\n", name);
+		ERR("failed to allocate memory for user file: %s", name);
 		return 1;
 	}
 
@@ -358,13 +357,13 @@ static int write_user_file(struct user *u) {
 	encbe64(rsa_pubkey_bufsize(u->pkey.bits), sizebuf);
 
 	if(rsa_pss_sign(&server_key, buf, sig1 - buf, sig1, sigsize) != 0) {
-		ERR();
+		INV();
 	}
 
 	rsa_pubkey2wire(&u->pkey, pkey, rsa_pubkey_bufsize(u->pkey.bits));
 
 	if(rsa_pss_sign(&server_key, buf, sig2 - buf, sig2, sigsize) != 0) {
-		ERR();
+		INV();
 	}
 
 	WRITE(uf, buf, bufsize);
@@ -380,7 +379,7 @@ exit:
 	/* none of this is sensitive so we don't need to zero it */
 
 	return ret;
-#undef ERR
+#undef INV
 #undef WRITE
 }
 
@@ -389,18 +388,18 @@ static int load_user_files() {
 		return 1;
 	}
 
-	printf("reading user files from user dir %s\n", USER_DIR);
+	LOG("reading user files from user dir %s", USER_DIR);
 
 	DIR *userdir = opendir(USER_DIR);
 	if(userdir == NULL) {
-		fprintf(stderr, "failed to open userdir: %s\n", USER_DIR);
+		ERR("failed to open userdir: %s", USER_DIR);
 		return 1;
 	}
 
 	size_t upathlen = strlen(USER_DIR);
 	char *path = malloc(upathlen + 64 + 1);
 	if(path == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		return 1;
 	}
 	memcpy(path, USER_DIR, upathlen);
@@ -416,7 +415,7 @@ static int load_user_files() {
 		if(strlen(name) != 64) {
 			/* names are hex versions of sha256 hashes
 			 * so they are 64 characters long */
-			fprintf(stderr, "unrecognised file in user dir: %s\n", name);
+			ERR("unrecognised file in user dir: %s", name);
 			continue;
 		}
 		int valid = 1;
@@ -426,21 +425,21 @@ static int load_user_files() {
 			path[upathlen + i] = name[i];
 		}
 		if(!valid) {
-			fprintf(stderr, "unrecognised file in user dir: %s\n", name);
+			ERR("unrecognised file in user dir: %s", name);
 			continue;
 		}
-		printf("loading user file %s\n", name);
+		LOG("loading user file %s", name);
 
 		struct user u;
 
 		if(parse_user_file(path, &u) != 0) {
-			fprintf(stderr, "failed to parse user file: %s\n", name);
+			ERR("failed to parse user file: %s", name);
 			continue;
 		}
 
 		/* add it to the struct */
 		if(user_db_add_no_write(u) != 0) {
-			fprintf(stderr, "failed to add user to struct: %s\n", name);
+			ERR("failed to add user to struct: %s", name);
 		}
 	}
 
@@ -534,21 +533,21 @@ int user_db_add(struct user u) {
 	if(user_db_get_nolock(u.uid) != NULL) {
 		char name[64];
 		to_hex(u.uid, 0x20, name);
-		fprintf(stderr, "attempted to add already added user %s\n", name);
+		ERR("attempted to add already added user %s", name);
 		ret = -1;
 		goto exit;
 	}
 
 	/* create a user file */
 	if(write_user_file(&u) != 0) {
-		fprintf(stderr, "failed to write user file\n");
+		ERR("failed to write user file");
 		ret = 1;
 		goto exit;
 	}
 
 	/* add it to the table */
 	if(user_db_add_no_write(u) != 0) {
-		fprintf(stderr, "failed to add user struct to database\n");
+		ERR("failed to add user struct to database");
 		ret = 1;
 		goto exit;
 	}
@@ -560,7 +559,7 @@ exit:
 
 static int gen_undel_file(uint8_t *id) {
 	if(cs_rand(id, 0x20) != 0) {
-		fprintf(stderr, "failed to generate random numbers\n");
+		ERR("failed to generate random numbers");
 		return 1;
 	}
 
@@ -568,7 +567,7 @@ static int gen_undel_file(uint8_t *id) {
 	size_t pathlen = strlen(USER_DIR) + 64 + 1;
 	char *path = malloc(pathlen);
 	if(path == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		return 1;
 	}
 
@@ -578,11 +577,11 @@ static int gen_undel_file(uint8_t *id) {
 	struct stat st = {0};
 	if(stat(path, &st) == -1) {
 		if(errno != ENOENT) {
-			fprintf(stderr, "failed to read from undelivered dir: %s\n", path);
+			ERR("failed to read from undelivered dir: %s", path);
 			return 1;
 		}
 	} else {
-		fprintf(stderr, "RNG unsafe, repeat undel file generated: %s\n", path);
+		ERR("RNG unsafe, repeat undel file generated: %s", path);
 		return 1;
 	}
 

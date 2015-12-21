@@ -64,7 +64,7 @@ int add_umessage(struct message *m) {
 	switch(type) {
 	case 0:
 		/* typical message from friend */
-		fprintf(stderr, "NOT IMPLEMENTED: %s:%d\n", __FILE__, __LINE__);
+		ERR("NOT IMPLEMENTED: %s:%d", __FILE__, __LINE__);
 		ret = -1;
 		break;
 	case 1:
@@ -135,7 +135,7 @@ void *background_thread(void *_arg) {
 	}
 	release_netlock();
 
-	fprintf(stderr, "background thread crashed\n");
+	ERR("background thread crashed");
 	acquire_writelock(&lock);
 	stop = 1;
 	release_writelock(&lock);
@@ -148,7 +148,7 @@ void *background_thread(void *_arg) {
 
 int start_bg_thread(struct server_connection *sc) {
 	if(pthread_create(&bg_manager, NULL, background_thread, sc) != 0) {
-		fprintf(stderr, "failed to start background thread\n");
+		ERR("failed to start background thread");
 		return -1;
 	}
 

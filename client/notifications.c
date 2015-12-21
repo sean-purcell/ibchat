@@ -200,7 +200,7 @@ int init_notiffile(struct account *acc) {
 	uint8_t buf[96];
 
 	if(cs_rand(buf, 96) != 0) {
-		fprintf(stderr, "failed to generate random numbers\n");
+		ERR("failed to generate random numbers");
 		return -1;
 	}
 
@@ -219,12 +219,12 @@ int init_notiffile(struct account *acc) {
 	int ret = stat(fname, &st);
 	if(ret != 0) {
 		if(errno != ENOENT) {
-			fprintf(stderr, "could not access notif file dir: "
-				"%s\n", fname);
+			ERR("could not access notif file dir: "
+				"%s", fname);
 			return -1;
 		}
 	} else {
-		fprintf(stderr, "notif file already exists, RNG unsafe: %s\n",
+		ERR("notif file already exists, RNG unsafe: %s",
 			fname);
 		return -1;
 	}
@@ -326,7 +326,7 @@ uint8_t *notif_bin_parse(struct account *acc, struct notif **_n, uint8_t *ptr) {
 			f = f->next;
 		}
 		if(!f) {
-			fprintf(stderr, "referenced friend not found\n");
+			ERR("referenced friend not found");
 			return NULL;
 		}
 		ptr += 0x28;
@@ -358,7 +358,7 @@ uint8_t *notif_bin_parse(struct account *acc, struct notif **_n, uint8_t *ptr) {
 	return ptr;
 
 memfail:
-	fprintf(stderr, "failed to allocate memory\n");
+	ERR("failed to allocate memory");
 	return NULL;
 }
 

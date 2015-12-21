@@ -10,6 +10,7 @@
 #include "../crypto/crypto_layer.h"
 #include "../inet/connect.h"
 #include "../util/defaults.h"
+#include "../util/log.h"
 
 /* Returns -1 for programatic error, 1 for server error */
 int connect_server(char *addr, struct con_handle **con_hndl, RSA_PUBLIC_KEY *server_key, struct keyset *keys) {
@@ -18,9 +19,9 @@ int connect_server(char *addr, struct con_handle **con_hndl, RSA_PUBLIC_KEY *ser
 	server = client_connect(addr, DFLT_PORT);
 	if(server.fd == -1) {
 		if(errno == 0) {
-			fprintf(stderr, "could not find server at given address\n");
+			ERR("could not find server at given address");
 		} else {
-			perror("could not connect to server");
+			ERR("could not connect to server: %s", strerror(errno));
 		}
 
 		return 1;
@@ -36,17 +37,17 @@ int connect_server(char *addr, struct con_handle **con_hndl, RSA_PUBLIC_KEY *ser
 
 	ret = client_handshake(*con_hndl, server_key, keys, &res);
 	if(ret == -1) {
-		fprintf(stderr, "a program error occurred during handshake\n");
+		ERR("a program error occurred during handshake");
 
 		goto err;
 	} else if(ret == 1) {
-		fprintf(stderr, "server failed to perform handshake\n");
+		ERR("server failed to perform handshake");
 
 		goto err;
 	}
 
 	if(res != 0) {
-		fprintf(stderr, "server performed invalid handshake\n");
+		ERR("server performed invalid handshake");
 
 		ret = 2;
 

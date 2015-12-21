@@ -15,6 +15,8 @@
 #include <libibur/util.h>
 #include <libibur/endian.h>
 
+#include "../util/log.h"
+
 #include "ibchat_client.h"
 #include "friends.h"
 #include "datafile.h"
@@ -68,7 +70,7 @@ int init_friendfile(struct account *acc) {
 	uint8_t buf[96];
 
 	if(cs_rand(buf, 96) != 0) {
-		fprintf(stderr, "failed to generate random numbers\n");
+		ERR("failed to generate random numbers");
 		return -1;
 	}
 
@@ -89,12 +91,12 @@ int init_friendfile(struct account *acc) {
 	int ret = stat(fname, &st);
 	if(ret != 0) {
 		if(errno != ENOENT) {
-			fprintf(stderr, "could not access friend file dir: "
-				"%s\n", fname);
+			ERR("could not access friend file dir: "
+				"%s", fname);
 			return -1;
 		}
 	} else {
-		fprintf(stderr, "friend file already exists, RNG unsafe: %s\n",
+		ERR("friend file already exists, RNG unsafe: %s",
 			fname);
 		return -1;
 	}

@@ -20,7 +20,9 @@
 #include "notifications.h"
 
 int pick_account(struct profile *prof, struct account **acc) {
+	LOG("selecting account");
 	if(prof->server_accounts == NULL) {
+		LOG("no accounts");
 		printf("no accounts found\nregister a new one? [y/n] ");
 
 		int ans = yn_prompt();
@@ -55,6 +57,7 @@ int pick_account(struct profile *prof, struct account **acc) {
 	}
 
 	if(selection == 0) {
+		LOG("new account selected");
 		return 0x55;
 	} else {
 		idx = 1;
@@ -70,11 +73,12 @@ int pick_account(struct profile *prof, struct account **acc) {
 			acc_list = acc_list->next;
 		}
 
-		fprintf(stderr, "failed to find account corresponding to selection: %" PRIu64 "\n", selection);
+		ERR("failed to find account corresponding to selection: %" PRIu64 "\n", selection);
 		return -1;
 
 		found:;
 	}
+	LOG("account found: %s", (*acc)->uname);
 
 	return 0;
 }

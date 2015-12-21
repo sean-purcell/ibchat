@@ -33,7 +33,7 @@ int send_friendreq(struct server_connection *sc, struct account *acc) {
 	/* prompt for a username */
 	char *uname = getusername("friend name", stdout);
 	if(uname == NULL) {
-		fprintf(stderr, "failed to get friend name\n");
+		ERR("failed to get friend name");
 		return -1;
 	}
 
@@ -58,7 +58,7 @@ int send_friendreq(struct server_connection *sc, struct account *acc) {
 	pthread_mutex_unlock(&bg_lock);
 
 	if(pkey_resp->length < 0x21) {
-		fprintf(stderr, "server returned invalid message\n");
+		ERR("server returned invalid message");
 		goto err;
 	}
 
@@ -68,12 +68,12 @@ int send_friendreq(struct server_connection *sc, struct account *acc) {
 	}
 
 	if(pkey_resp->length < 0x29) {
-		fprintf(stderr, "server returned invalid message\n");
+		ERR("server returned invalid message");
 		goto err;
 	}
 
 	if(memcmp(&pkey_resp->message[1], uid, 32) != 0) {
-		fprintf(stderr, "server returned public key for wrong user\n");
+		ERR("server returned public key for wrong user");
 		goto err;
 	}
 
@@ -81,7 +81,7 @@ int send_friendreq(struct server_connection *sc, struct account *acc) {
 		&pkey_resp->message[0x21]));
 
 	if(pkeysize + 0x21 != pkey_resp->length) {
-		fprintf(stderr, "server returned invalid message\n");
+		ERR("server returned invalid message");
 	}
 
 	uint8_t *pkey_bin = &pkey_resp->message[0x21];
@@ -142,7 +142,7 @@ static int send_pkey_req(struct server_connection *sc, uint8_t target[32]) {
 	if(acquire_netlock() != 0) return -1;
 	uint8_t *message = malloc(1 + 0x20);
 	if(message == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		goto err;
 	}
 
@@ -150,7 +150,7 @@ static int send_pkey_req(struct server_connection *sc, uint8_t target[32]) {
 	memcpy(&message[1], target, 0x20);
 
 	if(send_message(sc->ch, &sc->keys, message, 0x21) != 0) {
-		fprintf(stderr, "failed to send pkey request\n");
+		ERR("failed to send pkey request");
 		goto err;
 	}
 
@@ -180,7 +180,7 @@ static int send_friendreq_message(struct server_connection *sc,
 	reqlen += siglen; /* sig */
 	uint8_t *reqbody = malloc(reqlen);
 	if(reqbody == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		return -1;
 	}
 
@@ -205,29 +205,29 @@ static int send_friendreq_message(struct server_connection *sc,
 	encbe64(payloadlen + 0x20, ptr); ptr += 8;
 
 	if(cs_rand(keys, 64) != 0) {
-		fprintf(stderr, "failed to generate encryption keys\n");
+		ERR("failed to generate encryption keys");
 		goto err;
 	}
 
 	if(rsa_wire2pubkey(pkey, pkeylen, &rec_key) != 0) {
-		fprintf(stderr, "failed to expand public key\n");
+		ERR("failed to expand public key");
 		goto err;
 	}
 
 	if(rsa_oaep_encrypt(&rec_key, keys, 64, ptr, encblen) != 0) {
-		fprintf(stderr, "failed to encrypt keys\n");
+		ERR("failed to encrypt keys");
 		goto err;
 	}
 	ptr += encblen;
 
 	my_key = malloc(my_keylen);
 	if((my_key = malloc(my_keylen)) == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		goto err;
 	}
 	if(rsa_wire_prikey2pubkey(acc->key_bin, acc->k_len,
 		my_key, my_keylen) != 0) {
-		fprintf(stderr, "failed to convert private key\n");
+		ERR("failed to convert private key");
 		goto err;
 	}
 
@@ -244,24 +244,24 @@ static int send_friendreq_message(struct server_connection *sc,
 	ptr += payloadlen + 0x20;
 
 	if(rsa_wire2prikey(acc->key_bin, acc->k_len, &sig_key) != 0) {
-		fprintf(stderr, "failed to expand private key\n");
+		ERR("failed to expand private key");
 		goto err;
 	}
 	if(rsa_pss_sign(&sig_key, &reqbody[0x29], reqlen - siglen - 0x29,
 		ptr, siglen) != 0) {
-		fprintf(stderr, "failed to sign\n");
+		ERR("failed to sign");
 		goto err;
 	}
 	ptr += siglen;
 
 	if(ptr - reqbody != reqlen) {
-		fprintf(stderr, "invalid payload length\n");
+		ERR("invalid payload length");
 		goto err;
 	}
 
 	if(acquire_netlock() != 0) goto err;
 	if(send_message(sc->ch, &sc->keys, reqbody, reqlen) != 0) {
-		fprintf(stderr, "failed to send message\n");
+		ERR("failed to send message");
 		goto err;
 	}
 	release_netlock();
@@ -307,7 +307,7 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 
 	/* expand the private key */
 	if(rsa_wire2prikey(acc->key_bin, acc->k_len, &rkey) != 0) {
-		fprintf(stderr, "failed to expand private key\n");
+		ERR("failed to expand private key");
 		goto err;
 	}
 
@@ -328,7 +328,7 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 	/* start building the friendreq struct */
 	freq = malloc(sizeof(*freq));
 	if(freq == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		goto err;
 	}
 	freq->u_len = decbe64(&data[0]);
@@ -337,7 +337,7 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 	freq->pkey = malloc(freq->k_len + 1);
 
 	if(freq->uname == NULL || freq->pkey == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		goto err;
 	}
 
@@ -373,7 +373,7 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 	/* everything is valid, place it in the queue */
 	struct notif *n = malloc(sizeof(struct notif));
 	if(n == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		goto err;
 	}
 
@@ -417,7 +417,7 @@ int friendreq_response(struct friendreq *freq) {
 	LOG("friend request: %s %s", freq->uname, sig);
 	int res = yn_prompt();
 	if(res == -1) {
-		fprintf(stderr, "failed to get response\n");
+		ERR("failed to get response");
 	}
 
 	if(res == 0) {
@@ -430,7 +430,7 @@ int friendreq_response(struct friendreq *freq) {
 }
 
 int friendreq_send_response(struct friendreq *freq) {
-	LOG("NOT IMPLEMENTED\n");
+	ERR("NOT IMPLEMENTED");
 	return -1;
 }
 

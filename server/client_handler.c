@@ -24,6 +24,7 @@
 #include "../inet/message.h"
 #include "../util/defaults.h"
 #include "../util/lock.h"
+#include "../util/log.h"
 
 struct handler_arg {
 	pthread_t thread;
@@ -63,7 +64,7 @@ int spawn_handler(int fd) {
 	}
 	pthread_attr_setdetachstate(&handler_attributes, PTHREAD_CREATE_JOINABLE);
 
-	printf("%d: spawning handler thread\n", fd);
+	LOG("%d: spawning handler thread", fd);
 	if(pthread_create(&arg->thread, &handler_attributes, client_handler, arg) != 0) {
 		return -1;
 	}
@@ -155,14 +156,14 @@ void *client_handler(void *_arg) {
 	fd = ((struct handler_arg *)_arg)->fd;
 
 	if(init_client_handler(_arg, &c_hndl) != 0) {
-		fprintf(stderr, "%d: failed to initialize client handler structure\n",
+		ERR("%d: failed to initialize client handler structure",
 			fd);
 		goto err1;
 	}
 
 	/* initiate the connection handler thread */
 	if(launch_handler(&ch_thread, &c_mgr.handler, fd) != 0) {
-		fprintf(stderr, "%d: failed to launch handler thread\n", fd);
+		ERR("%d: failed to launch handler thread", fd);
 		goto err2;
 	}
 	c_mgr.fd = fd;
@@ -170,15 +171,15 @@ void *client_handler(void *_arg) {
 
 	/* complete the handshake */
 	if((ret = client_handler_handshake(c_mgr.handler, &keys)) != 0) {
-		printf("%d: failed to complete handshake: %d\n", fd, ret);
+		LOG("%d: failed to complete handshake: %d", fd, ret);
 		goto err3;
 	}
-	printf("%d: successfully completed handshake\n", fd);
+	LOG("%d: successfully completed handshake", fd);
 	pthread_cleanup_push(keys_cleanup_end_handler, &keys);
 
 	/* now we can start communicating with this user */
 	if(auth_user(&c_hndl, c_mgr.handler, &keys, c_hndl.id) != 0) {
-		fprintf(stderr, "%d: failed to authorize user\n", fd);
+		ERR("%d: failed to authorize user", fd);
 		goto err4;
 	}
 
@@ -187,14 +188,14 @@ void *client_handler(void *_arg) {
 
 	/* insert them into the user table */
 	if(add_handler(&c_hndl) != 0) {
-		fprintf(stderr, "%d: failed to add to the handler table\n", fd);
+		ERR("%d: failed to add to the handler table", fd);
 		goto err4;
 	}
 	pthread_cleanup_push(ht_cleanup_end_handler, &c_hndl);
 
 	/* TODO: implement undelivered */
 	//if(send_undelivered(c_hndl.id, c_mgr.handler, &keys) != 0) {
-	//	fprintf(stderr, "%d: failed to send undelivered messages\n", fd);
+	//	ERR("%d: failed to send undelivered messages", fd);
 		/* this is an acceptable error
 		 * we can continue to interact with the user */
 	//}
@@ -212,7 +213,7 @@ err3:
 	pthread_cleanup_pop(1); /* end the connection handler */
 err2:
 err1:
-	printf("%d: exiting\n", fd);
+	LOG("%d: exiting", fd);
 	return NULL;
 }
 
@@ -254,8 +255,8 @@ static int handle_message(struct message *m, struct client_handler *c_hndl) {
 		/* sanity check the message length field */
 		uint64_t payloadlen = decbe64(&m->message[1+0x20]);
 		if(1+0x20+0x08+payloadlen != m->length) {
-			fprintf(stderr, "%d: message length field does not "
-				"claimed length\n", c_hndl->fd);
+			ERR("%d: message length field does not "
+				"claimed length", c_hndl->fd);
 			return -1;
 		}
 
@@ -272,8 +273,8 @@ static int handle_message(struct message *m, struct client_handler *c_hndl) {
 		if(t_hndl == NULL) {
 			/* user not logged in */
 			if(add_undelivered_message(u, resp, resplen) != 0) {
-				fprintf(stderr, "%d: failed to add to undel "
-				"file\n", c_hndl->fd);
+				ERR("%d: failed to add to undel "
+				"file", c_hndl->fd);
 				return -1;
 			}
 			break;
@@ -281,8 +282,8 @@ static int handle_message(struct message *m, struct client_handler *c_hndl) {
 
 		if(send_message(t_hndl->hndl, t_hndl->keys,
 			resp, resplen) != 0) {
-			fprintf(stderr, "%d: failed to send message"
-				"to target %d\n", c_hndl->fd, t_hndl->fd);
+			ERR("%d: failed to send message"
+				"to target %d", c_hndl->fd, t_hndl->fd);
 			return -1;
 		}
 
@@ -301,8 +302,8 @@ static int handle_message(struct message *m, struct client_handler *c_hndl) {
 			rsa_pubkey_bufsize(u->pkey.bits));
 
 		if(resp == NULL) {
-			fprintf(stderr,
-				"%d: failed to allocate memory\n",
+			ERR(
+				"%d: failed to allocate memory",
 				c_hndl->fd);
 			return -1;
 		}
@@ -315,8 +316,8 @@ static int handle_message(struct message *m, struct client_handler *c_hndl) {
 
 		if(send_message(c_hndl->hndl, c_hndl->keys, resp, 0x21 +
 			rsa_pubkey_bufsize(u->pkey.bits)) != 0) {	
-			fprintf(stderr,
-				"%d: failed to send response\n",
+			ERR(
+				"%d: failed to send response",
 				c_hndl->fd);
 			return -1;
 		}
@@ -324,7 +325,7 @@ static int handle_message(struct message *m, struct client_handler *c_hndl) {
 		break;
 	}
 	default:
-		fprintf(stderr, "%d: illegal message code %d\n",
+		ERR("%d: illegal message code %d",
 			c_hndl->fd, m->message[0]);
 		break;
 	}
@@ -335,8 +336,8 @@ static int handle_message(struct message *m, struct client_handler *c_hndl) {
 static int send_u_notfound(struct client_handler *c_hndl, uint8_t *uid) {
 	uint8_t *resp = malloc(1 + 0x20);
 	if(resp == NULL) {
-		fprintf(stderr,
-			"%d: failed to allocate memory\n",
+		ERR(
+			"%d: failed to allocate memory",
 			c_hndl->fd);
 		return -1;
 	}
@@ -346,8 +347,8 @@ static int send_u_notfound(struct client_handler *c_hndl, uint8_t *uid) {
 
 	if(send_message(c_hndl->hndl, c_hndl->keys, resp,
 		1+0x20) != 0) {
-		fprintf(stderr,
-			"%d: failed to send response\n",
+		ERR(
+			"%d: failed to send response",
 			c_hndl->fd);
 
 		free(resp);

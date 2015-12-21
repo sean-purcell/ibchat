@@ -19,6 +19,8 @@
 #include "message.h"
 #include "protocol.h"
 
+#include "../util/log.h"
+
 //#define PROTO_DEBUG
 
 #define WAIT_TIMEOUT (10000000ULL)
@@ -36,7 +38,7 @@
 #else
 #define IO_CHECK(x, y) {                                                       \
         if((x) == -1) { goto error; }                                          \
-        if((x) != (y)) { fprintf(stderr, "%d: IO_CHECK failed\n", __LINE__);   \
+        if((x) != (y)) { ERR("%d: IO_CHECK failed", __LINE__);   \
                 errno = ETIME; goto error;}                                    \
 }
 #endif
@@ -176,11 +178,11 @@ struct message *get_message(struct con_handle *con, uint64_t timeout) {
 		wait.tv_sec += wait.tv_nsec / 1000000000LL;
 		wait.tv_nsec %= 1000000000LL;
 #ifdef PROTO_DEBUG
-		printf("%d: entering wait\n", con->sockfd);
+		LOG("%d: entering wait", con->sockfd);
 #endif
 		pthread_cond_timedwait(&con->in_cond, &con->in_mutex, &wait);
 #ifdef PROTO_DEBUG
-		printf("%d: exiting wait\n", con->sockfd);
+		LOG("%d: exiting wait", con->sockfd);
 #endif
 		pthread_mutex_unlock(&con->in_mutex);
 
@@ -189,13 +191,13 @@ struct message *get_message(struct con_handle *con, uint64_t timeout) {
 
 	if(!(timeout == 0 || utime(now) - utime(start) < timeout)) {
 #ifdef PROTO_DEBUG
-		fprintf(stderr, "time elapsed to read message: %llu\n", timeout);
+		ERR("time elapsed to read message: %llu", timeout);
 #endif
 
 		errno = ETIME;
 	} else {
 #ifdef PROTO_DEBUG
-		fprintf(stderr, "handler had non-zero kill status: %d\n", handler_status(con));
+		ERR("handler had non-zero kill status: %d", handler_status(con));
 #endif
 
 		errno = EPIPE;
@@ -215,7 +217,7 @@ void add_message(struct con_handle *con, struct message *m) {
 	}
 
 #ifdef PROTO_DEBUG
-	printf("%d: wrote message and write flag\n", con->sockfd);
+	LOG("%d: wrote message and write flag", con->sockfd);
 #endif
 
 	pthread_mutex_unlock(&con->out_mutex);
@@ -259,7 +261,7 @@ void *handle_connection(void *_con) {
 
 		if(select(FD_SETSIZE, &rset, NULL, NULL, &select_wait) == -1) {
 #ifdef PROTO_DEBUG
-			fprintf(stderr, "%d: select error: %s\n", __LINE__,
+			ERR("%d: select error: %s", __LINE__,
 				strerror(errno));
 #endif
 			if(errno != EINTR) {
@@ -272,7 +274,7 @@ void *handle_connection(void *_con) {
 			if(ret != 0) {
 				if(ret != EBUSY) {
 #ifdef PROTO_DEBUG
-					fprintf(stderr, "%d: mutex lock error: %s\n",
+					ERR("%d: mutex lock error: %s",
 						__LINE__, strerror(ret));
 #endif
 					goto error;
@@ -293,7 +295,7 @@ void *handle_connection(void *_con) {
 
 		if(FD_ISSET(con->out_cond[0], &rset)) {
 #ifdef PROTO_DEBUG
-			printf("%d: out_cond flag set\n", con->sockfd);
+			LOG("%d: out_cond flag set", con->sockfd);
 #endif
 			char c;
 			while(read(con->out_cond[0], &c, 1) != 1) {
@@ -311,7 +313,7 @@ void *handle_connection(void *_con) {
 			if(ret != 0) {
 				if(ret != EBUSY) {
 #ifdef PROTO_DEBUG
-					fprintf(stderr, "%d: mutex lock error: %s\n",
+					ERR("%d: mutex lock error: %s",
 						__LINE__, strerror(ret));
 #endif
 					goto error;
@@ -325,7 +327,7 @@ void *handle_connection(void *_con) {
 				if(ret != 0) {
 					pthread_mutex_unlock(&con->out_mutex);
 #ifdef PROTO_DEBUG
-					printf("connection closed\n");
+					LOG("connection closed");
 #endif
 					goto error;
 				}
@@ -344,8 +346,8 @@ void *handle_connection(void *_con) {
 			while(el != NULL) {
 				if(el->time < earliest_ack) {
 #ifdef PROTO_DEBUG
-					printf("%llu acknowledge not received "
-					       "in time\n", el->seq_num);
+					LOG("%llu acknowledge not received "
+					       "in time", el->seq_num);
 #endif
 					errno = ETIME;
 					goto error;
@@ -357,7 +359,7 @@ void *handle_connection(void *_con) {
 
 		if(utime(now) - ACK_WAITTIME > con->ka_last_recv) {
 #ifdef PROTO_DEBUG
-			printf("keep alive not received in time\n");
+			LOG("keep alive not received in time");
 #endif
 			errno = ETIME;
 			goto error;
@@ -379,7 +381,7 @@ void *handle_connection(void *_con) {
 
 error:
 #ifdef PROTO_DEBUG
-	fprintf(stderr, "%d: handler exiting: %s\n", con->sockfd,
+	ERR("%d: handler exiting: %s", con->sockfd,
 		strerror(errno));
 #endif
 exit:
@@ -441,7 +443,7 @@ static int write_messages(struct con_handle *con, struct ack_map *map) {
 
 		message_queue_pop(&con->out_queue);
 #ifdef PROTO_DEBUG
-		printf("%llu sent\n", next_message->seq_num);
+		LOG("%llu sent", next_message->seq_num);
 #endif
 		free_message(next_message);
 		gettimeofday(&tv, NULL);
@@ -481,20 +483,20 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 		IO_CHECK(received, 8);
 		if(ack_map_rm(map, decbe64(buf)) == -1) {
 #ifdef PROTO_DEBUG
-			fprintf(stderr, "ack_map doesn't contain key\n");
+			ERR("ack_map doesn't contain key");
 #endif
 			errno = EINVAL;
 			goto error;
 		}
 #ifdef PROTO_DEBUG
-		printf("%llu ack'ed\n", decbe64(buf));
+		LOG("%llu ack'ed", decbe64(buf));
 #endif
 		break;
 	case 3: /* KA */
 		gettimeofday(&now, NULL);
 		con->ka_last_recv = utime(now);
 #ifdef PROTO_DEBUG
-		printf("ka received\n");
+		LOG("ka received");
 #endif
 		break;
 	case 2: /* new message */
@@ -539,12 +541,12 @@ static int read_message(struct con_handle *con, struct ack_map *map) {
 			goto error;
 		}
 #ifdef PROTO_DEBUG
-		printf("%llu ack sent\n", in_message->seq_num);
+		LOG("%llu ack sent", in_message->seq_num);
 #endif
 		break;
 	default:
 #ifdef PROTO_DEBUG
-		fprintf(stderr, "invalid type value: %llu\n", (uint64_t)type);
+		ERR("invalid type value: %llu", (uint64_t)type);
 #endif
 		errno = EINVAL;
 		goto error;
@@ -575,7 +577,7 @@ static ssize_t send_bytes(int fd, void *buf, size_t len, int flags, uint64_t tim
 
 		if(select(FD_SETSIZE, NULL, &wset, NULL, &wait) == -1) {
 #ifdef PROTO_DEBUG
-			fprintf(stderr, "%d: select error: %s\n", __LINE__,
+			ERR("%d: select error: %s", __LINE__,
 				strerror(errno));
 #endif
 			goto error;
@@ -585,7 +587,7 @@ static ssize_t send_bytes(int fd, void *buf, size_t len, int flags, uint64_t tim
 		if(written == -1) {
 			if(errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
 #ifdef PROTO_DEBUG
-				fprintf(stderr, "%d: socket write error: %s\n",
+				ERR("%d: socket write error: %s",
 					__LINE__, strerror(errno));
 #endif
 				goto error;
@@ -624,7 +626,7 @@ static ssize_t read_bytes(int fd, void *buf, size_t len, int flags, uint64_t tim
 
 		if(select(FD_SETSIZE, &rset, NULL, NULL, &wait) == -1) {
 #ifdef PROTO_DEBUG
-			fprintf(stderr, "%d: select error: %s\n", __LINE__,
+			ERR("%d: select error: %s", __LINE__,
 				strerror(errno));
 #endif
 			goto error;
@@ -634,7 +636,7 @@ static ssize_t read_bytes(int fd, void *buf, size_t len, int flags, uint64_t tim
 		if(received == -1) {
 			if(errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK) {
 #ifdef PROTO_DEBUG
-				fprintf(stderr, "%d: socket read error: %s\n",
+				ERR("%d: socket read error: %s",
 					__LINE__, strerror(errno));
 #endif
 				goto error;

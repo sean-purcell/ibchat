@@ -13,6 +13,7 @@
 #include "ibchat_client.h"
 
 #include "../util/line_prompt.h"
+#include "../util/log.h"
 
 int register_profile(char *pass, struct profile *acc);
 
@@ -50,7 +51,7 @@ int login_profile(char *pass, struct profile *prof) {
 
 	int ret;
 	if((ret = read_userfile(prof)) != 0) {
-		fprintf(stderr, "failed to read userfile: %d\n", ret);
+		ERR("failed to read userfile: %d", ret);
 		goto err;
 	}
 
@@ -91,12 +92,12 @@ int register_profile(char *pass, struct profile *prof) {
 	}
 
 	if(gen_profile(prof)) {
-		fprintf(stderr, "failed to generate profile data\n");
+		ERR("failed to generate profile data");
 		goto err;
 	}
 	int ret;
 	if((ret = write_userfile(prof)) != 0) {
-		fprintf(stderr, "failed to write userfile: %d\n", ret);
+		ERR("failed to write userfile: %d", ret);
 		goto err;
 	}
 
@@ -131,7 +132,7 @@ int rewrite_profile(struct profile *prof) {
 	}
 
 	if(write_userfile(prof) != 0) {
-		fprintf(stderr, "failed to write userfile\n");
+		ERR("failed to write userfile");
 	}
 
 	return 0;
@@ -145,14 +146,14 @@ int check_userfile(struct profile *prof) {
 int profile_reseed(struct profile *prof) {
 	printf("your user profile has been written 2^64 times, reseeding password\n");
 	if(cs_rand(prof->salt, 32) != 0) {
-		fprintf(stderr, "failed to generate random numbers\n");
+		ERR("failed to generate random numbers");
 		return 1;
 	}
 
 	uint8_t scrypt_out[96];
 	if(scrypt(prof->pass, strlen(prof->pass), prof->salt, 32,
 		1ULL << 16, 8, 1, 96, scrypt_out) != 0) {
-		fprintf(stderr, "scrypt failed to generate new keys\n");
+		ERR("scrypt failed to generate new keys");
 		return 1;
 	}
 
@@ -199,12 +200,12 @@ int key_expand(struct profile *prof) {
 
 	if(scrypt(prof->pass, strlen(prof->pass), prof->salt, 32,
 		(uint64_t)1 << 16, 8, 1, 96, scrypt_out) != 0) {
-		fprintf(stderr, "failed to expand password\n");
+		ERR("failed to expand password");
 		goto err;
 	}
 
 	if(memcmp_ct(pw_check, prof->pw_check, 0x20) != 0) {
-		fprintf(stderr, "password incorrect\n");
+		ERR("password incorrect");
 		goto err;
 	}
 

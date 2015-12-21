@@ -13,6 +13,7 @@
 #include <libibur/endian.h>
 
 #include "../util/line_prompt.h"
+#include "../util/log.h"
 
 #include "friends.h"
 #include "cli.h"
@@ -45,7 +46,7 @@ int select_conversation(struct account *acc) {
 		return 0;
 	}
 	if(sel > fnum) {
-		fprintf(stderr, "error in selection\n");
+		ERR("error in selection");
 		return 1;
 	}
 
@@ -107,7 +108,7 @@ int cfile_init(struct friend *f) {
 	hmac_sha256(f->f_hmac_key, 32, buf, 16, &buf[16]);
 
 	if(fwrite(buf, 1, 0x30, file) != 0x30) {
-		fprintf(stderr, "failed to write to conversation file: %s\n",
+		ERR("failed to write to conversation file: %s",
 			path);
 		goto err;
 	}
@@ -126,14 +127,14 @@ end:
 struct cmessage *cfile_load(struct friend *f) {
 #define READ(buf, len) do {\
 	if(fread(buf, 1, len, file) != len) {\
-		fprintf(stderr, "conversation file read failed\n");\
+		ERR("conversation file read failed");\
 		goto err;\
 	}\
 	} while(0)
 
 #define MACCHK() do {\
 	if(memcmp_ct(macf, macc, 0x20) != 0) {\
-		fprintf(stderr, "conversation file invalid\n");\
+		ERR("conversation file invalid");\
 		goto err;\
 	}\
 	} while(0)
@@ -152,7 +153,7 @@ struct cmessage *cfile_load(struct friend *f) {
 
 	file = fopen(path, "rb");
 	if(file == NULL) {
-		fprintf(stderr, "failed to open conversation file: %s\n",
+		ERR("failed to open conversation file: %s",
 			path);
 		goto err;
 	}
@@ -193,14 +194,14 @@ struct cmessage *cfile_load(struct friend *f) {
 		uint64_t mlen = decbe64(&tmp[0]);
 		uint64_t sender = decbe64(&tmp[8]);
 		if(sender != 0 && sender != 1) {
-			fprintf(stderr, "conversation file invalid\n");
+			ERR("conversation file invalid");
 			goto err;
 		}
 
 		/* the prefix is valid, load the message */
 		*loc = alloc_cmessage(mlen);
 		if(*loc == NULL) {
-			fprintf(stderr, "failed to allocate memory\n");
+			ERR("failed to allocate memory");
 			goto err;
 		}
 
@@ -239,7 +240,7 @@ struct cmessage *cfile_load(struct friend *f) {
 	}
 
 	if(pos != flen) {
-		fprintf(stderr, "conversation file invalid\n");
+		ERR("conversation file invalid");
 		goto err;
 	}
 
@@ -264,21 +265,21 @@ end:
 int cfile_add(struct friend *f, struct cmessage *m) {
 #define READ(buf, len) do {\
 	if(fread(buf, 1, len, file) != len) {\
-		fprintf(stderr, "conversation file read failed\n");\
+		ERR("conversation file read failed");\
 		goto err;\
 	}\
 	} while(0)
 
 #define WRITE(buf, len) do {\
 	if(fwrite(buf, 1, len, file) != len) {\
-		fprintf(stderr, "conversation file write failed\n");\
+		ERR("conversation file write failed");\
 		goto err;\
 	}\
 	} while(0)
 
 #define MACCHK() do {\
 	if(memcmp_ct(macf, macc, 0x20) != 0) {\
-		fprintf(stderr, "conversation file invalid\n");\
+		ERR("conversation file invalid");\
 		goto err;\
 	}\
 	} while(0)
@@ -297,7 +298,7 @@ int cfile_add(struct friend *f, struct cmessage *m) {
 
 	file = fopen(path, "rb+");
 	if(file == NULL) {
-		fprintf(stderr, "failed to open conversation file: %s\n",
+		ERR("failed to open conversation file: %s",
 			path);
 		goto err;
 	}
@@ -346,7 +347,7 @@ int cfile_add(struct friend *f, struct cmessage *m) {
 
 	encm = malloc(mlen);
 	if(encm == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		goto err;
 	}
 

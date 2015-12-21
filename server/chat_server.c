@@ -38,8 +38,8 @@ RSA_PUBLIC_KEY server_pub_key;
 FILE *lgf;
 
 void usage(char *argv0) {
-	fprintf(stderr, "usage: %s [-p port] "
-		"[-d server_root_directory] [--no-pw] <key file>\n", argv0);
+	ERR("usage: %s [-p port] "
+		"[-d server_root_directory] [--no-pw] <key file>", argv0);
 }
 
 static struct option longopts[] = {
@@ -83,7 +83,7 @@ int chat_server(int argc, char **argv) {
 	if(opts.use_password) {
 		password = line_prompt("Server password", NULL, 1);
 		if(password == NULL) {
-			fprintf(stderr, "failed to read password\n");
+			ERR("failed to read password");
 			return 1;
 		}
 	}
@@ -113,13 +113,13 @@ int chat_server(int argc, char **argv) {
 		goto err3;
 	}
 
-	printf("server opened on port %s\n", opts.port);
+	LOG("server opened on port %s", opts.port);
 
 	/* program main body */
 	init_sighandlers();
 	/* TODO: start the manager thread */
 	if(handle_connections(server_socket.fd) != 0) {
-		fprintf(stderr, "handle connections error: %s\n", strerror(errno));
+		ERR("handle connections error: %s", strerror(errno));
 		goto err4;
 	}
 
@@ -146,7 +146,7 @@ int handle_connections(int server_socket) {
 	stop = 0;
 
 	if(init_handler_table() != 0) {
-		fprintf(stderr, "failed to initialize handler table: %s\n",
+		ERR("failed to initialize handler table: %s",
 			strerror(errno));
 		return 1;
 	}
@@ -171,7 +171,7 @@ int handle_connections(int server_socket) {
 		if(FD_ISSET(server_socket, &rd_set)) {
 			/* accept a connection and set it up */
 			struct sock client = server_accept(server_socket);
-			printf("received connection from %s with fd %d\n",
+			LOG("received connection from %s with fd %d",
 				client.address, client.fd);
 
 			if(spawn_handler(client.fd) != 0) {
@@ -220,18 +220,18 @@ int process_opts(int argc, char **argv) {
 		wordexp_t expanded;
 		memset(&expanded, 0, sizeof(expanded));
 		if(wordexp(opts.root_dir, &expanded, WRDE_UNDEF) != 0) {
-			fprintf(stderr, "failed to expand root dir\n");
+			ERR("failed to expand root dir");
 			return 1;
 		}
 
 		if(expanded.we_wordc != 1) {
-			fprintf(stderr, "invalid root dir\n");
+			ERR("invalid root dir");
 			return 1;
 		}
 
 		opts.root_dir = strdup(expanded.we_wordv[0]);
 		if(opts.root_dir == NULL) {
-			fprintf(stderr, "strdup failed on root dir\n");
+			ERR("strdup failed on root dir");
 			return 1;
 		}
 
@@ -242,11 +242,11 @@ int process_opts(int argc, char **argv) {
 }
 
 void print_opts() {
-	printf("option values:\n"
+	LOG("option values:"
 	       "port    :%s\n"
 	       "root_dir:%s\n"
 	       "keyfile :%s\n"
-	       "use_pass:%d\n",
+	       "use_pass:%d",
 	       opts.port,
 	       opts.root_dir,
 	       opts.keyfile,
@@ -281,13 +281,13 @@ int load_server_key(char *keyfile, char *password, RSA_KEY *server_key) {
 			break;
 		}
 
-		fprintf(stderr, "%s\n", estr);
+		ERR("%s", estr);
 
 		return 1;
 	}
 
 	if(rsa_pub_key(server_key, &server_pub_key) != 0) {
-		fprintf(stderr, "failed to create public key\n");
+		ERR("failed to create public key");
 		return 1;
 	}
 
@@ -296,7 +296,7 @@ int load_server_key(char *keyfile, char *password, RSA_KEY *server_key) {
 		uint64_t len = rsa_pubkey_bufsize(server_pub_key.bits);
 		uint8_t* key_bin = malloc(len);
 		if(key_bin == NULL) {
-			fprintf(stderr, "failed to allocate memory\n");
+			ERR("failed to allocate memory");
 			return 1;
 		}
 		uint8_t hash[32];
@@ -307,8 +307,8 @@ int load_server_key(char *keyfile, char *password, RSA_KEY *server_key) {
 		to_hex(hash, 32, hex);
 		hex[64] = '\0';
 
-		printf("server fingerprint:\n"
-			"%s\n",
+		LOG("server fingerprint:"
+			"%s",
 			hex);
 
 		free(key_bin);
@@ -321,19 +321,19 @@ int check_root_dir(char *fname) {
 	struct stat st = {0};
 	if(stat(fname, &st) == -1) {
 		if(errno != ENOENT) {
-			fprintf(stderr, "failed to open root directory: %s\n", fname);
+			ERR("failed to open root directory: %s", fname);
 			return -1;
 		}
 
 		/* directory doesn't exist, create it */
 		if(mkdir(fname, 0700) != 0) {
-			fprintf(stderr, "failed to create root directory: %s\n", fname);
+			ERR("failed to create root directory: %s", fname);
 			return -1;
 		}
 	} else {
 		/* make sure its a directory */
 		if(!S_ISDIR(st.st_mode)) {
-			fprintf(stderr, "specified root is not a directory: %s\n", fname);
+			ERR("specified root is not a directory: %s", fname);
 			return -1;
 		}
 	}
@@ -346,7 +346,7 @@ int open_logfile(char *root_dir) {
 	size_t len = strlen(root_dir) + strlen(pathend) + 1;
 	char *path = malloc(len);
 	if(path == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		return -1;
 	}
 	strcpy(path, root_dir);
@@ -354,7 +354,7 @@ int open_logfile(char *root_dir) {
 
 	lgf = fopen(path, "a");
 	if(lgf == NULL) {
-		fprintf(stderr, "failed to open log file\n");
+		ERR("failed to open log file");
 		free(path);
 		return -1;
 	}
@@ -369,11 +369,11 @@ int open_logfile(char *root_dir) {
 
 int server_bind_err(struct sock server_socket) {
 	if(server_socket.fd == -1) {
-		fprintf(stderr, "failed to bind: %s\n", strerror(errno));
+		ERR("failed to bind: %s", strerror(errno));
 		return 1;
 	}
 	if(server_socket.fd == -2) {
-		fprintf(stderr, "failed to bind: %s\n", gai_strerror(errno));
+		ERR("failed to bind: %s", gai_strerror(errno));
 		return 1;
 	}
 

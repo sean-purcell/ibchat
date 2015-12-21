@@ -11,6 +11,8 @@
 
 #include "datafile.h"
 
+#include "../util/log.h"
+
 int write_datafile(char *path, void *arg, void *data, struct format_desc *f) {
 	int ret = -1;
 
@@ -28,14 +30,14 @@ int write_datafile(char *path, void *arg, void *data, struct format_desc *f) {
 
 	FILE *ff = fopen(path, "wb");
 	if(ff == NULL) {
-		fprintf(stderr, "failed to open file for writing: %s\n", path);
+		ERR("failed to open file for writing: %s", path);
 		goto err;
 	}
 
 	pref_len = 0x50 + f->pref_len;
 	prefix = malloc(pref_len);
 	if(prefix == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		goto err;
 	}
 
@@ -50,7 +52,7 @@ int write_datafile(char *path, void *arg, void *data, struct format_desc *f) {
 	encbe64(payload_num, &prefix[0]);
 	encbe64(payload_len, &prefix[8]);
 	if(cs_rand(&prefix[0x10], 0x20) != 0) {
-		fprintf(stderr, "failed to generate random numbers\n");
+		ERR("failed to generate random numbers");
 		goto err;
 	}
 	if(f->p_fill(arg, &prefix[0x30]) != 0) {
@@ -74,7 +76,7 @@ int write_datafile(char *path, void *arg, void *data, struct format_desc *f) {
 
 	payload = malloc(payload_len);
 	if(payload == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		goto err;
 	}
 
@@ -89,7 +91,7 @@ int write_datafile(char *path, void *arg, void *data, struct format_desc *f) {
 		cur = *((void **) ((char*)cur + f->next_off));
 	}
 	if(ptr - payload != payload_len) {
-		fprintf(stderr, "written length does not match expected\n");
+		ERR("written length does not match expected");
 		goto err;
 	}
 
@@ -127,7 +129,7 @@ err:
 	return ret;
 
 writerr:
-	fprintf(stderr, "failed to write to file: %s\n", path);
+	ERR("failed to write to file: %s", path);
 	goto err;
 }
 
@@ -152,14 +154,14 @@ int read_datafile(char *path, void *arg, void **data, struct format_desc *f) {
 
 	FILE *ff = fopen(path, "rb");
 	if(ff == NULL) {
-		fprintf(stderr, "failed to open file for reading: %s\n", path);
+		ERR("failed to open file for reading: %s", path);
 		goto err;
 	}
 
 	pref_len = 0x50 + f->pref_len;
 	prefix = malloc(pref_len);
 	if(prefix == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		goto err;
 	}
 
@@ -179,7 +181,7 @@ int read_datafile(char *path, void *arg, void **data, struct format_desc *f) {
 
 	hmac_sha256(hmac_key, 0x20, prefix, pref_len - 0x20, mac1);
 	if(memcmp_ct(mac1, &prefix[pref_len-0x20], 0x20) != 0) {
-		fprintf(stderr, "invalid file\n");
+		ERR("invalid file");
 		goto err;
 	}
 
@@ -191,7 +193,7 @@ int read_datafile(char *path, void *arg, void **data, struct format_desc *f) {
 
 	payload = malloc(payload_len);
 	if(payload == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
+		ERR("failed to allocate memory");
 		goto err;
 	}
 
@@ -209,7 +211,7 @@ int read_datafile(char *path, void *arg, void **data, struct format_desc *f) {
 	hmac_sha256_final(&hctx, mac2c);
 
 	if(memcmp_ct(mac2c, mac2f, 0x20) != 0) {
-		fprintf(stderr, "invalid file\n");
+		ERR("invalid file");
 		goto err;
 	}
 
@@ -227,11 +229,11 @@ int read_datafile(char *path, void *arg, void **data, struct format_desc *f) {
 		cur = (void **) ((char*)(*cur) + f->next_off);
 	}
 	if(i != payload_num) {
-		fprintf(stderr, "read num does not match expected\n");
+		ERR("read num does not match expected");
 		goto err;
 	}
 	if(ptr - payload != payload_len) {
-		fprintf(stderr, "read length does not match expected\n");
+		ERR("read length does not match expected");
 		goto err;
 	}
 
@@ -247,7 +249,7 @@ err:
 	return ret;
 
 readerr:
-	fprintf(stderr, "failed to read from file: %s\n", path);
+	ERR("failed to read from file: %s", path);
 	goto err;
 
 }

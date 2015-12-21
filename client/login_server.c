@@ -18,6 +18,7 @@
 #include "../crypto/crypto_layer.h"
 #include "../util/line_prompt.h"
 #include "../util/defaults.h"
+#include "../util/log.h"
 
 static int send_login_message(struct con_handle *ch, struct account *acc, RSA_KEY *rkey, struct keyset *keys) {
 	struct message *challenge = NULL;
@@ -30,7 +31,7 @@ static int send_login_message(struct con_handle *ch, struct account *acc, RSA_KE
 	}
 
 	if(challenge->length != 0x20) {
-		fprintf(stderr, "invalid challenge message from server\n");
+		ERR("invalid challenge message from server");
 		goto err;
 	}
 
@@ -60,12 +61,12 @@ static int send_login_message(struct con_handle *ch, struct account *acc, RSA_KE
 	encbe64((bits + 7) / 8, sigl_b);
 
 	if(rsa_pss_sign(rkey, resp, sig_b - resp, sig_b, (bits + 7) / 8) != 0) {
-		fprintf(stderr, "failed to sign message\n");
+		ERR("failed to sign message");
 		goto err;
 	}
 
 	if(send_message(ch, keys, resp, size) != 0) {
-		fprintf(stderr, "failed to send message\n");
+		ERR("failed to send message");
 		goto err;
 	}
 
@@ -91,7 +92,7 @@ int get_server_authresponse(struct con_handle *ch, struct keyset *keys) {
 	if(authresponse->length != 8 ||
 		memcmp("cliauth", authresponse->message, 7) != 0 ||
 		(authresponse->message[7] > 4) != 0) {
-		fprintf(stderr, "server sent invalid authorization response\n");
+		ERR("server sent invalid authorization response");
 
 		free_message(authresponse);
 		return -1;
@@ -175,20 +176,20 @@ int create_account(struct account *acc, struct server_connection *sc) {
 	printf("generating identity key\n");
 
 	if(rsa_gen_key(&rsa_key, 2048, 65537) != 0) {
-		fprintf(stderr, "failed to generate identity key\n");
+		ERR("failed to generate identity key");
 		goto err;
 	}
 
 	uname = getusername(NULL, stdout);
 	if(uname == NULL) {
-		fprintf(stderr, "failed to read username\n");
+		ERR("failed to read username");
 		goto err;
 	}
 
 	printf("server address [leave empty for default]: ");
 	addr = line_prompt(NULL, NULL, 0);
 	if(addr == NULL) {
-		fprintf(stderr, "failed to read input\n");
+		ERR("failed to read input");
 		goto err;
 	}
 
@@ -197,7 +198,7 @@ int create_account(struct account *acc, struct server_connection *sc) {
 		addr = strdup(DFLT_ADDR);
 
 		if(addr == NULL) {
-			fprintf(stderr, "failed to duplicate string\n");
+			ERR("failed to duplicate string");
 			return -1;
 		}
 	}
@@ -223,21 +224,21 @@ int create_account(struct account *acc, struct server_connection *sc) {
 	ret = prompt_verify_skey(acc, &sc->server_key, 1);
 	if(ret != 0) {
 		if(ret == -1) {
-			fprintf(stderr, "failed to authenticate server key\n");
+			ERR("failed to authenticate server key");
 		}
 		goto serr;
 	}
 
 	/* now that we're connected we need to ask to register */
 	if(send_login_message(sc->ch, acc, &rsa_key, &sc->keys) != 0) {
-		fprintf(stderr, "failed to send login message to server\n");
+		ERR("failed to send login message to server");
 		goto serr;
 	}
 
 	/* get the response */
 	int servresp = get_server_authresponse(sc->ch, &sc->keys);
 	if(servresp == -1) {
-		fprintf(stderr, "failed to get authorization response from server\n");
+		ERR("failed to get authorization response from server");
 		goto serr;
 	}
 
@@ -259,18 +260,18 @@ int create_account(struct account *acc, struct server_connection *sc) {
 		break;
 	}
 	if(servresp != 1) {
-		fprintf(stderr, "programmatic error occurred\n");
+		ERR("programmatic error occurred");
 		goto serr;
 	}
 
 	printf("registering user %s at %s\n", acc->uname, acc->addr);
 	if(send_message(sc->ch, &sc->keys, (uint8_t*) "register", 8) != 0) {
-		fprintf(stderr, "failed to send registration message\n");
+		ERR("failed to send registration message");
 		goto serr;
 	}
 
 	if(init_account_file(acc) != 0) {
-		fprintf(stderr, "failed to init account file\n");
+		ERR("failed to init account file");
 		goto serr;
 	}
 
@@ -289,7 +290,7 @@ err:
 int login_account(struct account *acc, struct server_connection *sc) {
 	RSA_KEY rsa_key;
 	if(rsa_wire2prikey(acc->key_bin, acc->k_len, &rsa_key) != 0) {
-		fprintf(stderr, "failed to expand identity key\n");
+		ERR("failed to expand identity key");
 		return 1;
 	}
 
@@ -303,7 +304,7 @@ int login_account(struct account *acc, struct server_connection *sc) {
 	ret = prompt_verify_skey(acc, &sc->server_key, 0);
 	if(ret != 0) {
 		if(ret == -1) {
-			fprintf(stderr, "failed to authenticate server key\n");
+			ERR("failed to authenticate server key");
 			goto serr;
 		}
 		if(ret == 1) {
@@ -314,14 +315,14 @@ int login_account(struct account *acc, struct server_connection *sc) {
 
 	/* now that we're connected we need to ask to register */
 	if(send_login_message(sc->ch, acc, &rsa_key, &sc->keys) != 0) {
-		fprintf(stderr, "failed to send login message to server\n");
+		ERR("failed to send login message to server");
 		goto serr;
 	}
 
 	/* get the response */
 	int servresp = get_server_authresponse(sc->ch, &sc->keys);
 	if(servresp == -1) {
-		fprintf(stderr, "failed to get authorization response from server\n");
+		ERR("failed to get authorization response from server");
 		goto serr;
 	}
 
@@ -345,7 +346,7 @@ int login_account(struct account *acc, struct server_connection *sc) {
 		goto serr;
 	}
 	if(servresp != 1 && servresp != 0) {
-		fprintf(stderr, "programmatic error occurred\n");
+		ERR("programmatic error occurred");
 		goto serr;
 	}
 	if(servresp == 1) {
@@ -356,7 +357,7 @@ int login_account(struct account *acc, struct server_connection *sc) {
 		printf("registering user %s at %s\n", acc->uname, acc->addr);
 
 		if(send_message(sc->ch, &sc->keys, (uint8_t*) "register", 8) != 0) {
-			fprintf(stderr, "failed to send registration message\n");
+			ERR("failed to send registration message");
 			goto serr;
 		}
 	}

@@ -168,7 +168,7 @@ char *file_path(uint8_t id[32]) {
 	size_t rootdir_len = strlen(ROOT_DIR);
 	char *fname = malloc(rootdir_len + 64 + 1);
 	if(fname == NULL) {
-		fprintf(stderr, "failed to allocate memory for path\n");
+		ERR("failed to allocate memory for path");
 		return NULL;
 	}
 

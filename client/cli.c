@@ -10,6 +10,7 @@
 #include <libibur/endian.h>
 
 #include "../util/lock.h"
+#include "../util/log.h"
 #include "../util/line_prompt.h"
 
 #include "cli.h"
@@ -53,7 +54,7 @@ int main(int argc, char **argv) {
 
 	/* log the user in */
 	if(login_profile(NULL, &prof) != 0) {
-		fprintf(stderr, "failed to login\n");
+		ERR("failed to login");
 		return 1;
 	}
 
@@ -75,7 +76,7 @@ int main(int argc, char **argv) {
 int select_profile() {
 	int ret;
 	if((ret = pick_account(&prof, &acc)) < 0) {
-		fprintf(stderr, "failed to pick account\n");
+		ERR("failed to pick account");
 		return 1;
 	}
 	if(ret == 1) {
@@ -86,22 +87,22 @@ int select_profile() {
 	if(ret == 0x55) { /* register a new account */
 		acc = malloc(sizeof(*acc));
 		if(acc == NULL) {
-			fprintf(stderr, "failed to allocate memory\n");
+			ERR("failed to allocate memory");
 			return 1;
 		}
 		if(create_account(acc, &sc) != 0) {
-			fprintf(stderr, "failed to register account\n");
+			ERR("failed to register account");
 			return 1;
 		}
 
 		/* we should write the user file again */
 		if(add_account(&prof, acc) != 0) {
-			fprintf(stderr, "failed to add account to user file\n");
+			ERR("failed to add account to user file");
 			return 1;
 		}
 	} else { /* login an existing account */
 		if(login_account(acc, &sc) != 0) {
-			fprintf(stderr, "failed to login account\n");
+			ERR("failed to login account");
 			return 1;
 		}
 
@@ -111,13 +112,13 @@ int select_profile() {
 
 		/* load the friend file */
 		if(read_friendfile(acc) != 0) {
-			fprintf(stderr, "failed to read friend file\n");
+			ERR("failed to read friend file");
 			return 1;
 		}
 
 		/* load the notiffile */
 		if(read_notiffile(acc, &notifs) != 0) {
-			fprintf(stderr, "failed to read notiffs\n");
+			ERR("failed to read notiffs");
 			return 1;
 		}
 	}
@@ -130,7 +131,7 @@ int handler_select();
 
 int handle_user() {
 	if(!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO)) {
-		fprintf(stderr, "ibchat must be run in a tty\n");
+		ERR("ibchat must be run in a tty");
 		return 1;
 	}
 
@@ -143,9 +144,11 @@ int handle_user() {
 		handler_select();
 	}
 	if(handler_status(sc.ch) != 0) {
+		LOG("server disconnected");
 		printf("server disconnected\n");
 	}
 	set_mode(-1);
+	LOG("exiting");
 	printf("exiting\n");
 	return 0;
 }
@@ -157,12 +160,12 @@ int handler_init() {
 		uint64_t keylen = rsa_pubkey_bufsize(decbe64(acc->key_bin));
 		uint8_t *pkey = malloc(keylen);
 		if(pkey == NULL) {
-			fprintf(stderr, "failed to allocate memory\n");
+			ERR("failed to allocate memory");
 			return 1;
 		}
 		if(rsa_wire_prikey2pubkey(acc->key_bin, acc->k_len,
 			pkey, keylen) != 0) {
-			fprintf(stderr, "failed to convert key to public\n");
+			ERR("failed to convert key to public");
 			return 1;
 		}
 		uint8_t hash[32];
@@ -234,7 +237,7 @@ int handler_select() {
 		}
 		break;
 	default:
-		fprintf(stderr, "error occurred in selection\n");
+		ERR("error occurred in selection");
 		stop = 1;
 		break;
 	}

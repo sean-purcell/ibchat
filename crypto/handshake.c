@@ -17,6 +17,7 @@
 #include "crypto_layer.h"
 
 #include "../inet/protocol.h"
+#include "../util/log.h"
 
 /* don't import the whole file just for this */
 extern uint64_t utime(struct timeval tv);
@@ -24,7 +25,7 @@ extern uint64_t utime(struct timeval tv);
 //#define HANDSHAKE_DEBUG
 
 #ifdef HANDSHAKE_DEBUG
-# define HS_TRACE() do { fprintf(stderr, "ERROR: %d\n", __LINE__); } while(0);
+# define HS_TRACE() do { ERR("ERROR: %d", __LINE__); } while(0);
 #else
 # define HS_TRACE() do { } while(0);
 #endif
@@ -112,7 +113,7 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 	}
 
 #ifdef HANDSHAKE_DEBUG
-	printf("received client message\n");
+	LOG("received client message");
 #endif
 
 	/* expand the response */
@@ -200,7 +201,7 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 	if((ret = rsa_pss_sign(rsa_key, response, sig_off, &response[sig_off], sig_size)) != 0) {
 		HS_TRACE();
 #ifdef HANDSHAKE_DEBUG
-		fprintf(stderr, "rsa_pss_sign ret:%d\n", ret);
+		ERR("rsa_pss_sign ret:%d", ret);
 #endif
 		return -1;
 	}
