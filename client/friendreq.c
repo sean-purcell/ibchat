@@ -383,11 +383,7 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 
 	n->next = NULL;
 
-	LOGLINE();
-
-	insert_notif(n);
-
-	LOGLINE();
+	add_notif(n);
 
 end:
 	ret = 0;

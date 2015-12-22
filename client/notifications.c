@@ -180,6 +180,14 @@ void print_notif(struct notif *n, int num) {
 	}
 }
 
+int add_notif(struct notif *n) {
+	int ret;
+	if((ret = insert_notif(n)) != 0) return ret;
+
+	if(get_mode() == 0) set_mode(0xff);
+	return 0;
+}
+
 int insert_notif(struct notif *n) {
 	int ret = 0;
 	acquire_writelock(&lock);

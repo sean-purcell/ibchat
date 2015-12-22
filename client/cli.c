@@ -186,6 +186,10 @@ int handler_init() {
 void wait_for_event();
 
 int handler_select() {
+	if(get_mode() == 0xff) {
+		printf("new notification\n");
+		set_mode(0);
+	}
 	int notiflen = notiflist_len(notifs);
 
 	printf("user: %s\n"
