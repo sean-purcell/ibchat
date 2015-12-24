@@ -23,7 +23,9 @@
 #include "bg_manager.h"
 
 static int send_pkey_req(struct server_connection *sc, uint8_t target[32]);
-static int send_friendreq_message(struct server_connection *sc, struct account *acc, uint8_t target[32], uint8_t *pkey, uint64_t pkeylen);
+static int send_friendreq_message(struct server_connection *sc,
+	struct account *acc, uint8_t target[32],
+	uint8_t *pkey, uint64_t pkeylen);
 static int verify_pkey(char *target, uint8_t *pkey_bin, uint64_t pkey_len);
 
 int send_friendreq(struct server_connection *sc, struct account *acc) {
@@ -161,9 +163,10 @@ err:
 	return ret;
 }
 
-static int send_friendreq_message(struct server_connection *sc,
+static int send_rsa_message(struct server_connection *sc,
 	struct account *acc, uint8_t target[32], uint8_t *pkey,
-	uint64_t pkeylen) {
+	uint64_t pkeylen, uint8_t *ex_data, uint64_t ed_len) {
+
 	int ret = -1;
 
 	uint64_t encblen = (decbe64(pkey) + 7) / 8;
@@ -176,6 +179,7 @@ static int send_friendreq_message(struct server_connection *sc,
 	reqlen += 0x10; /* payload prefix */
 	reqlen += acc->u_len; /* username */
 	reqlen += rsa_pubkey_bufsize(decbe64(acc->key_bin)); /* pkey */
+	reqlen += ed_len; /* extra data */
 	reqlen += 0x20; /* MAC */
 	reqlen += siglen; /* sig */
 	uint8_t *reqbody = malloc(reqlen);
@@ -192,7 +196,7 @@ static int send_friendreq_message(struct server_connection *sc,
 	uint64_t my_keylen = rsa_pubkey_bufsize(decbe64(acc->key_bin));
 	uint8_t keys[64];
 	uint8_t *payload = NULL;
-	uint64_t payloadlen = 0x10 + acc->u_len + my_keylen;
+	uint64_t payloadlen = 0x10 + acc->u_len + my_keylen + ed_len;
 
 	uint8_t *ptr = reqbody;
 
@@ -233,15 +237,14 @@ static int send_friendreq_message(struct server_connection *sc,
 
 	payload = ptr;
 
-	encbe64(acc->u_len, &payload[0x00]);
-	encbe64(my_keylen, &payload[0x08]);
-	memcpy(&payload[0x10], acc->uname, acc->u_len);
-	memcpy(&payload[0x10+acc->u_len], my_key, my_keylen);
+	encbe64(acc->u_len, ptr); ptr += 0x08;
+	encbe64(my_keylen, ptr); ptr += 0x08;
+	memcpy(ptr, acc->uname, acc->u_len); ptr += acc->u_len;
+	memcpy(ptr, my_key, my_keylen); ptr += my_keylen;
+	if(ex_data) memcpy(ptr, ex_data, ed_len); ptr += ed_len;
 
 	chacha_enc(&keys[0], 32, 0, payload, payload, payloadlen);
 	hmac_sha256(&keys[32], 32, payload, payloadlen, &payload[payloadlen]);
-
-	ptr += payloadlen + 0x20;
 
 	if(rsa_wire2prikey(acc->key_bin, acc->k_len, &sig_key) != 0) {
 		ERR("failed to expand private key");
@@ -276,6 +279,12 @@ err:;
 	rsa_free_prikey(&sig_key);
 
 	return ret;
+}
+
+static int send_friendreq_message(struct server_connection *sc,
+	struct account *acc, uint8_t target[32], uint8_t *pkey,
+	uint64_t pkeylen) {
+	return send_rsa_message(sc, acc, target, pkey, pkeylen, NULL, 0);
 }
 
 int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
@@ -400,7 +409,6 @@ inv:
 	goto end;
 }
 
-
 int friendreq_response(struct friendreq *freq) {
 	uint8_t hash[32];
 	char sig[65];
@@ -408,7 +416,7 @@ int friendreq_response(struct friendreq *freq) {
 	to_hex(hash, 32, sig);
 	printf("friend request from %s\n"
 		"key signature: %s\n"
-		"trust this key? [y/n] ",
+		"accept friend request? [y/n] ",
 		freq->uname, sig);
 	LOG("friend request: %s %s", freq->uname, sig);
 	int res = yn_prompt();
