@@ -52,7 +52,7 @@ static int send_login_message(struct con_handle *ch, struct account *acc, RSA_KE
 	sigl_b = chn_b + 0x20;
 	sig_b = sigl_b + 8;
 
-	sha256((uint8_t *)acc->uname, acc->u_len + 1, uid_b);
+	gen_uid(acc->uname, uid_b);
 	if(rsa_wire_prikey2pubkey(acc->key_bin, acc->k_len, pkey_b,
 		rsa_pubkey_bufsize(bits)) != 0) {
 		goto err;

@@ -21,6 +21,7 @@
 #include "friendreq.h"
 #include "uname.h"
 #include "bg_manager.h"
+#include "uname.h"
 
 static int send_pkey_req(struct server_connection *sc, uint8_t target[32]);
 static int send_friendreq_message(struct server_connection *sc,
@@ -41,7 +42,7 @@ int send_friendreq(struct server_connection *sc, struct account *acc) {
 
 	/* get the uid */
 	uint8_t uid[32];
-	sha256((uint8_t*)uname, strlen(uname) + 1, uid);
+	gen_uid(uname, uid);
 
 	if(send_pkey_req(sc, uid) != 0) {
 		goto err;

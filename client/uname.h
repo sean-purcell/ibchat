@@ -14,7 +14,7 @@ int valid_uname(char *uname, size_t ulen);
 
 /* the id of the user, defined as the sha256 hash of their username
  * terminated with '\0' */
-void gen_uid(char *uname, size_t ulen, uint8_t uid[32]);
+void gen_uid(char *uname, uint8_t uid[32]);
 
 /* for use in hash tables
  * the salt should be randomly chosen when the program starts */
