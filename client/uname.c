@@ -61,7 +61,7 @@ char *getusername(const char *prompt, FILE *out) {
 }
 
 void gen_uid(char *uname, uint8_t uid[32]) {
-	sha256(uname, strlen(uname) + 1, uid);
+	sha256((uint8_t *)uname, strlen(uname) + 1, uid);
 }
 
 void uid_hash(uint8_t salt[32], uint8_t uid[32], uint8_t hash[32]) {

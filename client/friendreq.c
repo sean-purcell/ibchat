@@ -434,9 +434,62 @@ int friendreq_response(struct friendreq *freq) {
 	return friendreq_send_response(freq);
 }
 
+static int friendreq_send_resp_message(struct friendreq *freq,
+	struct friend *f) {
+	uint8_t keys[0x80];
+
+	if(cs_rand(keys, 0x80) != 0) {
+		ERR("failed to generate random keys");
+		return 1;
+	}
+
+	uint8_t target[0x20];
+	gen_uid(freq->uname, target);
+
+	int ret = send_rsa_message(&sc, acc, target, freq->pkey, freq->k_len,
+		keys, 0x80);
+	if(ret != 0) {
+		ERR("failed to send response message");
+		return 1;
+	}
+
+	memcpy(f->s_symm_key, &keys[0x00], 0x20);
+	memcpy(f->s_hmac_key, &keys[0x20], 0x20);
+	memcpy(f->r_symm_key, &keys[0x40], 0x20);
+	memcpy(f->r_hmac_key, &keys[0x60], 0x20);
+
+	memsets(keys, 0, sizeof(keys));
+	memsets(target, 0, sizeof(target));
+
+	return 0;
+}
+
 int friendreq_send_response(struct friendreq *freq) {
-	ERR("NOT IMPLEMENTED");
-	return -1;
+	struct friend *f = init_friend(freq->uname, freq->pkey,
+		freq->u_len, freq->k_len);
+	if(f == NULL) {
+		ERR("failed to initialize friend");
+		return 1;
+	}
+	/* send the response and then add them as a friend */
+	if(friendreq_send_resp_message(freq, f) != 0) {
+		goto err;
+	}
+	struct friend **loc = &(acc->friends);
+	while(*loc) {
+		loc = &(*loc)->next;
+	}
+	*loc = f;
+
+	if(write_friendfile(acc) != 0) {
+		ERR("failed to write friendfile");
+		goto err;
+	}
+
+	return 0;
+err:
+	delete_friend(f);
+	return 1;
 }
 
 void free_friendreq(struct friendreq *freq) {

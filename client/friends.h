@@ -30,6 +30,10 @@ int init_friendfile(struct account *acc);
 int write_friendfile(struct account *acc);
 int read_friendfile(struct account *acc);
 
+struct friend *init_friend(char *uname, uint8_t *pkey,
+	uint64_t u_len, uint64_t k_len);
+int delete_friend(struct friend *f);
+
 uint64_t friend_bin_size(struct friend *f);
 uint8_t *friend_write_bin(struct friend *f, uint8_t *ptr);
 uint8_t *friend_parse_bin(struct friend **_f, uint8_t *ptr);
