@@ -25,7 +25,7 @@ pthread_cond_t bg_wait  = PTHREAD_COND_INITIALIZER;
 
 pthread_mutex_t net_lock = PTHREAD_MUTEX_INITIALIZER;
 
-#define WAITTIME ((uint64_t) 100000ULL)
+#define WAITTIME ((uint64_t) 10000ULL)
 
 int acquire_netlock() {
 	pthread_mutex_lock(&net_lock);
