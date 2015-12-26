@@ -61,6 +61,36 @@ static struct format_desc ff_format = {
 	ff_dataread,
 };
 
+struct friend *init_friend(char *uname, uint8_t *pkey,
+	uint64_t u_len, uint64_t k_len) {
+
+	struct friend *f = malloc(sizeof(*f));
+	if(f == NULL) {
+		goto err;
+	}
+	memset(f, 0, sizeof(*f));
+
+	if((f->uname = malloc(u_len + 1)) == NULL) {
+		goto err;
+	}
+	if((f->pkey = malloc(k_len + 1)) == NULL) {
+		goto err;
+	}
+
+	memcpy(f->uname, uname, u_len + 1);
+	memcpy(f->pkey, pkey, k_len);
+	f->u_len = u_len;
+	f->k_len = k_len;
+
+	return f;
+
+err:
+	if(f && f->uname) zfree(f->uname, u_len);
+	if(f && f->pkey) zfree(f->pkey, k_len);
+	if(f) zfree(f, sizeof(*f));
+
+	return NULL;
+}
 
 char *friendfile_path(struct account *acc) {
 	return file_path(acc->f_file);
@@ -158,7 +188,7 @@ uint8_t *friend_write_bin(struct friend *f, uint8_t *ptr) {
 	encbe64(f->k_len, ptr); ptr += 8;
 
 	memcpy(ptr, f->uname, f->u_len); ptr += f->u_len;
-	memcpy(ptr, f->public_key, f->k_len); ptr += f->k_len;
+	memcpy(ptr, f->pkey, f->k_len); ptr += f->k_len;
 
 	memcpy(ptr, f->c_file, 32); ptr += 32;
 
@@ -184,15 +214,15 @@ uint8_t *friend_parse_bin(struct friend **_f, uint8_t *ptr) {
 	f->k_len = decbe64(ptr); ptr += 8;
 
 	f->uname = malloc(f->u_len) + 1;
-	f->public_key = malloc(f->k_len);
-	if(f->uname == NULL || f->public_key == NULL) {
+	f->pkey = malloc(f->k_len);
+	if(f->uname == NULL || f->pkey == NULL) {
 		return NULL;
 	}
 
 	memcpy(f->uname, ptr, f->u_len); ptr += f->u_len;
 	f->uname[f->u_len] = '\0';
 
-	memcpy(f->public_key, ptr, f->k_len); ptr += f->k_len;
+	memcpy(f->pkey, ptr, f->k_len); ptr += f->k_len;
 
 	memcpy(f->c_file, ptr, 32); ptr += 32;
 
@@ -213,7 +243,7 @@ uint8_t *friend_parse_bin(struct friend **_f, uint8_t *ptr) {
 
 void friend_free(struct friend *f) {
 	zfree(f->uname, f->u_len);
-	zfree(f->public_key, f->k_len);
+	zfree(f->pkey, f->k_len);
 	memsets(f, 0, sizeof(struct friend));
 }
 

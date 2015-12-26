@@ -9,7 +9,7 @@ struct friend {
 	uint64_t u_len;
 	uint64_t k_len;
 	char *uname;
-	uint8_t *public_key;
+	uint8_t *pkey;
 
 	uint8_t c_file[32];
 
