@@ -173,6 +173,8 @@ static int send_rsa_message(struct server_connection *sc,
 	uint64_t encblen = (decbe64(pkey) + 7) / 8;
 	uint64_t siglen = (decbe64(acc->key_bin) + 7) / 8;
 
+	if(!ex_data) ed_len = 0;
+
 	uint64_t reqlen = 0;
 	reqlen += 0x29; /* message type and destination/length */
 	reqlen += 0x11; /* friend message prefix */
@@ -246,6 +248,7 @@ static int send_rsa_message(struct server_connection *sc,
 
 	chacha_enc(&keys[0], 32, 0, payload, payload, payloadlen);
 	hmac_sha256(&keys[32], 32, payload, payloadlen, &payload[payloadlen]);
+	ptr += 32;
 
 	if(rsa_wire2prikey(acc->key_bin, acc->k_len, &sig_key) != 0) {
 		ERR("failed to expand private key");
@@ -465,6 +468,7 @@ static int friendreq_send_resp_message(struct friendreq *freq,
 }
 
 int friendreq_send_response(struct friendreq *freq) {
+	LOG("responding to friend request from %s", freq->uname);
 	struct friend *f = init_friend(freq->uname, freq->pkey,
 		freq->u_len, freq->k_len);
 	if(f == NULL) {
@@ -475,6 +479,8 @@ int friendreq_send_response(struct friendreq *freq) {
 	if(friendreq_send_resp_message(freq, f) != 0) {
 		goto err;
 	}
+	LOG("adding friend object to list");
+	acquire_writelock(&lock);
 	struct friend **loc = &(acc->friends);
 	while(*loc) {
 		loc = &(*loc)->next;
@@ -485,6 +491,7 @@ int friendreq_send_response(struct friendreq *freq) {
 		ERR("failed to write friendfile");
 		goto err;
 	}
+	release_writelock(&lock);
 
 	return 0;
 err:

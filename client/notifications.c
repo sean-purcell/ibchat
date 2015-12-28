@@ -129,10 +129,13 @@ int view_notifs(struct account *acc) {
 		notiflist_free(notifs);
 		notifs = NULL;
 		ret = write_notiffile(acc, NULL);
+		release_writelock(&lock);
 	}
+end:
+	return ret;
 err:
 	release_writelock(&lock);
-	return ret;
+	goto end;
 }
 
 int notif_selected(struct account *acc, struct notif *n) {
@@ -148,6 +151,7 @@ int notif_selected(struct account *acc, struct notif *n) {
 			return 1;
 		}
 	}
+	release_writelock(&lock);
 	switch(n->type) {
 	case 1:
 	case 3:
@@ -159,6 +163,7 @@ int notif_selected(struct account *acc, struct notif *n) {
 		return friendreq_response(n->freq);
 		break;
 	}
+	notif_free(n);
 
 	return 0;
 }
