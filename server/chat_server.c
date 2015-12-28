@@ -75,10 +75,14 @@ int chat_server(int argc, char **argv) {
 	if(process_opts(argc, argv) != 0) {
 		return 1;
 	}
-	print_opts();
 
 	password = NULL;
 	memset(&server_key, 0, sizeof(RSA_KEY));
+
+	if(open_logfile(opts.root_dir) != 0) {
+		goto err1;
+	}
+	print_opts();
 
 	if(opts.use_password) {
 		password = line_prompt("Server password", NULL, 1);
@@ -95,10 +99,6 @@ int chat_server(int argc, char **argv) {
 
 	/* make sure we have a root directory */
 	if(check_root_dir(opts.root_dir) != 0) {
-		goto err2;
-	}
-
-	if(open_logfile(opts.root_dir) != 0) {
 		goto err2;
 	}
 
@@ -132,9 +132,9 @@ int chat_server(int argc, char **argv) {
 err4:
 	close(server_socket.fd);
 err3:
-	fclose(lgf);
 err2:
 err1:
+	fclose(lgf);
 	/* cleanup */
 	if(password) zfree(password, strlen(password));
 	rsa_free_prikey(&server_key);
@@ -242,7 +242,7 @@ int process_opts(int argc, char **argv) {
 }
 
 void print_opts() {
-	LOG("option values:"
+	LOG("option values:\n"
 	       "port    :%s\n"
 	       "root_dir:%s\n"
 	       "keyfile :%s\n"
