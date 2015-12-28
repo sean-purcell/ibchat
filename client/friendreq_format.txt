@@ -20,7 +20,7 @@ Payload format
 Friend Request Response Format
 ==============================
 Prefix follows format outlaid in server/message_format.txt
-0x000-0x001 1, indicating the type of message (friend request)
+0x000-0x001 2, indicating the type of message (friend request response)
 0x001-0x009 length of encrypted key block
 0x009-0x011 length of encrypted payload
 0x011-0x111 symm and hmac keys for the rest of the message, encrypted with target's public key

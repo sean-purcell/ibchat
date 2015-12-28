@@ -71,6 +71,9 @@ int add_umessage(struct message *m) {
 		/* friend request */
 		ret = parse_friendreq(sender, payload, p_len);
 		break;
+	case 2:
+		ret = parse_friendreq_response(sender, payload, p_len);
+		break;
 	}
 
 	return ret;

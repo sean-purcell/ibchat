@@ -164,7 +164,7 @@ err:
 	return ret;
 }
 
-static int send_rsa_message(struct server_connection *sc,
+static int send_rsa_message(struct server_connection *sc, uint8_t m_type,
 	struct account *acc, uint8_t target[32], uint8_t *pkey,
 	uint64_t pkeylen, uint8_t *ex_data, uint64_t ed_len) {
 
@@ -207,7 +207,7 @@ static int send_rsa_message(struct server_connection *sc,
 	memcpy(ptr, target, 0x20); ptr += 0x20;
 	encbe64(reqlen - 0x29, ptr); ptr += 8;
 
-	ptr[0] = 1; ptr++;
+	ptr[0] = m_type; ptr++;
 	encbe64(encblen, ptr); ptr += 8;
 	encbe64(payloadlen + 0x20, ptr); ptr += 8;
 
@@ -285,13 +285,12 @@ err:;
 	return ret;
 }
 
-static int send_friendreq_message(struct server_connection *sc,
-	struct account *acc, uint8_t target[32], uint8_t *pkey,
-	uint64_t pkeylen) {
-	return send_rsa_message(sc, acc, target, pkey, pkeylen, NULL, 0);
-}
+static int parse_rsa_message(struct account *acc,
+	uint8_t *sender, uint8_t *payload, uint64_t p_len,
+	char **u_data, uint64_t *u_len,
+	uint8_t **k_data, uint64_t *k_len,
+	uint8_t *ex_data, uint64_t ed_len) {
 
-int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 	int ret = -1, inv = -1;
 
 	char s_hex[65];
@@ -338,24 +337,19 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 
 	chacha_dec(symm, 32, 0, data, data, db_len - 32);
 
-	/* start building the friendreq struct */
-	freq = malloc(sizeof(*freq));
-	if(freq == NULL) {
-		ERR("failed to allocate memory");
-		goto err;
-	}
-	freq->u_len = decbe64(&data[0]);
-	freq->k_len = decbe64(&data[8]);
-	freq->uname = malloc(freq->u_len + 1);
-	freq->pkey = malloc(freq->k_len + 1);
+	*u_len = decbe64(&data[0]);
+	*k_len = decbe64(&data[8]);
+	*u_data = malloc(*u_len + 1);
+	*k_data = malloc(*k_len);
 
-	if(freq->uname == NULL || freq->pkey == NULL) {
+	if(*u_data == NULL || *k_data == NULL) {
 		ERR("failed to allocate memory");
 		goto err;
 	}
 
-	memcpy(freq->uname, &data[16], freq->u_len);
-	memcpy(freq->pkey, &data[16+freq->u_len], freq->k_len);
+	memcpy(*u_data, &data[16], *u_len); (*u_data)[*u_len] = '\0';
+	memcpy(*k_data, &data[16+ *u_len], *k_len);
+	if(ex_data) memcpy(ex_data, &data[16 + *u_len + *k_len], ed_len);
 
 	uint64_t siglen = (decbe64(freq->pkey) + 7) / 8;
 
@@ -383,13 +377,57 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 		goto inv;
 	}
 
-	/* everything is valid, place it in the queue */
+	inv = 0;
+end:
+	ret = 0;
+err:
+	rsa_free_prikey(&rkey);
+	rsa_free_pubkey(&pkey);
+	memsets(keys, 0, sizeof(keys));
+	memsets(mac, 0, sizeof(mac));
+	if(ret || inv) free_friendreq(freq);
+	if(inv && !ret) ret = 1;
+	return ret;
+inv:
+/* invalid message reject it but do not error */
+	goto end;
+}
+
+static int send_friendreq_message(struct server_connection *sc,
+	struct account *acc, uint8_t target[32], uint8_t *pkey,
+	uint64_t pkeylen) {
+	return send_rsa_message(sc, 1, acc, target, pkey, pkeylen, NULL, 0);
+}
+
+int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
+	int ret = -1, inv = -1;
+	struct friendreq *freq = NULL;
+	/* start building the friendreq struct */
+	freq = malloc(sizeof(*freq));
+	if(freq == NULL) {
+		ERR("failed to allocate memory");
+		goto err;
+	}
+
+	int parse_ret = parse_rsa_message(acc, sender, payload, p_len,
+		&freq->uname, &freq->u_len,
+		&freq->pkey, &freq->k_len,
+		NULL, 0);
+	if(parse_ret < 0) {
+		ERR("failed to parse friendreq");
+		goto err;
+	}
+	if(parse_ret > 0) {
+		LOG("invalid message");
+		goto end;
+	}
+
+	/* everything is valid, message is parsed, place it in the queue */
 	struct notif *n = malloc(sizeof(struct notif));
 	if(n == NULL) {
 		ERR("failed to allocate memory");
 		goto err;
 	}
-
 
 	n->type = 2;
 	n->freq = freq;
@@ -398,19 +436,17 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 
 	add_notif(n);
 
+	inv = 0;
 end:
 	ret = 0;
-	inv = 0;
 err:
-	rsa_free_prikey(&rkey);
-	rsa_free_pubkey(&pkey);
-	memsets(keys, 0, sizeof(keys));
-	memsets(mac, 0, sizeof(mac));
 	if(ret || inv) free_friendreq(freq);
 	return ret;
-inv:
-/* invalid message reject it but do not error */
-	goto end;
+}
+
+int parse_friendreq_response(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
+	ERR("NOT IMPLEMENTED");
+	return -1;
 }
 
 int friendreq_response(struct friendreq *freq) {
@@ -449,7 +485,7 @@ static int friendreq_send_resp_message(struct friendreq *freq,
 	uint8_t target[0x20];
 	gen_uid(freq->uname, target);
 
-	int ret = send_rsa_message(&sc, acc, target, freq->pkey, freq->k_len,
+	int ret = send_rsa_message(&sc, 2, acc, target, freq->pkey, freq->k_len,
 		keys, 0x80);
 	if(ret != 0) {
 		ERR("failed to send response message");
