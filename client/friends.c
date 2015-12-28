@@ -92,6 +92,13 @@ err:
 	return NULL;
 }
 
+int delete_friend(struct friend *f) {
+	zfree(f->uname, f->u_len);
+	zfree(f->pkey, f->k_len);
+	zfree(f, sizeof(*f));
+	return 0;
+}
+
 char *friendfile_path(struct account *acc) {
 	return file_path(acc->f_file);
 }
