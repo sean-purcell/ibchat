@@ -307,8 +307,6 @@ static int parse_rsa_message(struct account *acc,
 	uint8_t *hmac = &keys[32];
 	uint8_t mac[32];
 
-	struct friendreq *freq = NULL;
-
 	/* keyblock and datablock */
 	uint64_t kb_len = decbe64(&payload[1]);
 	uint64_t db_len = decbe64(&payload[9]);
@@ -351,7 +349,7 @@ static int parse_rsa_message(struct account *acc,
 	memcpy(*k_data, &data[16+ *u_len], *k_len);
 	if(ex_data) memcpy(ex_data, &data[16 + *u_len + *k_len], ed_len);
 
-	uint64_t siglen = (decbe64(freq->pkey) + 7) / 8;
+	uint64_t siglen = (decbe64(*k_data) + 7) / 8;
 
 	if(p_len != kb_len + db_len + 17 + siglen) {
 		LOG("actual len: %d, expected len: %d", p_len,
@@ -360,7 +358,7 @@ static int parse_rsa_message(struct account *acc,
 	}
 
 	/* now verify the message */
-	if(rsa_wire2pubkey(freq->pkey, freq->k_len, &pkey) != 0) {
+	if(rsa_wire2pubkey(*k_data, *k_len, &pkey) != 0) {
 		goto inv;
 	}
 
@@ -385,7 +383,6 @@ err:
 	rsa_free_pubkey(&pkey);
 	memsets(keys, 0, sizeof(keys));
 	memsets(mac, 0, sizeof(mac));
-	if(ret || inv) free_friendreq(freq);
 	if(inv && !ret) ret = 1;
 	return ret;
 inv:
@@ -400,6 +397,7 @@ static int send_friendreq_message(struct server_connection *sc,
 }
 
 int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
+	LOG("parsing friend request");
 	int ret = -1, inv = -1;
 	struct friendreq *freq = NULL;
 	/* start building the friendreq struct */
@@ -414,7 +412,7 @@ int parse_friendreq(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
 		&freq->pkey, &freq->k_len,
 		NULL, 0);
 	if(parse_ret < 0) {
-		ERR("failed to parse friendreq");
+		ERR("failed to parse friend request");
 		goto err;
 	}
 	if(parse_ret > 0) {
@@ -445,8 +443,46 @@ err:
 }
 
 int parse_friendreq_response(uint8_t *sender, uint8_t *payload, uint64_t p_len) {
-	ERR("NOT IMPLEMENTED");
-	return -1;
+	LOG("parsing friend request response");
+	int ret = -1, inv = -1;
+
+	uint8_t keys[0x80];
+	char *uname; uint64_t u_len;
+	uint8_t *pkey; uint64_t k_len;
+
+	struct friend *f = NULL;
+
+	int parse_ret = parse_rsa_message(acc, sender, payload, p_len,
+		&uname, &u_len,
+		&pkey, &k_len,
+		keys, 0x80);
+	if(parse_ret < 0) {
+		ERR("failed to parse friend request response");
+		goto err;
+	}
+	if(parse_ret > 0) {
+		LOG("invalid message");
+		goto end;
+	}
+
+	/* build the friend structure */
+	f = init_friend(uname, pkey, u_len, k_len);
+
+	memcpy(f->r_symm_key, &keys[0x00], 0x20);
+	memcpy(f->r_hmac_key, &keys[0x20], 0x20);
+	memcpy(f->s_symm_key, &keys[0x40], 0x20);
+	memcpy(f->s_hmac_key, &keys[0x60], 0x20);
+
+	if(add_friend(f) != 0) {
+		goto err;
+	}
+
+	inv = 0;
+end:
+	ret = 0;
+err:
+	if(ret || inv) delete_friend(f);
+	return ret;
 }
 
 int friendreq_response(struct friendreq *freq) {
@@ -515,19 +551,10 @@ int friendreq_send_response(struct friendreq *freq) {
 	if(friendreq_send_resp_message(freq, f) != 0) {
 		goto err;
 	}
-	LOG("adding friend object to list");
-	acquire_writelock(&lock);
-	struct friend **loc = &(acc->friends);
-	while(*loc) {
-		loc = &(*loc)->next;
-	}
-	*loc = f;
 
-	if(write_friendfile(acc) != 0) {
-		ERR("failed to write friendfile");
+	if(add_friend(f) != 0) {
 		goto err;
 	}
-	release_writelock(&lock);
 
 	return 0;
 err:

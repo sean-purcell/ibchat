@@ -20,6 +20,7 @@
 #include "ibchat_client.h"
 #include "friends.h"
 #include "datafile.h"
+#include "cli.h"
 
 static int ff_p_fill(void *_arg, uint8_t *ptr) {
 	return 0;
@@ -77,10 +78,18 @@ struct friend *init_friend(char *uname, uint8_t *pkey,
 		goto err;
 	}
 
-	memcpy(f->uname, uname, u_len + 1);
+	strncpy(f->uname, uname, u_len + 1);
 	memcpy(f->pkey, pkey, k_len);
 	f->u_len = u_len;
 	f->k_len = k_len;
+
+	f->s_nonce = 0;
+	f->r_nonce = 0;
+	f->next = NULL;
+
+	if(cs_rand(f->c_file, 32) != 0) {
+		goto err;
+	}
 
 	return f;
 
@@ -90,6 +99,28 @@ err:
 	if(f) zfree(f, sizeof(*f));
 
 	return NULL;
+}
+
+int add_friend(struct friend *f) {
+	int ret = -1;
+
+	LOG("adding friend %s", f->uname);
+	acquire_writelock(&lock);
+	struct friend **loc = &(acc->friends);
+	while(*loc) {
+		loc = &(*loc)->next;
+	}
+	*loc = f;
+
+	if(write_friendfile(acc) != 0) {
+		ERR("failed to write friendfile");
+		goto err;
+	}
+
+	ret = 0;
+err:
+	release_writelock(&lock);
+	return ret;
 }
 
 int delete_friend(struct friend *f) {
