@@ -79,6 +79,11 @@ int chat_server(int argc, char **argv) {
 	password = NULL;
 	memset(&server_key, 0, sizeof(RSA_KEY));
 
+	/* make sure we have a root directory */
+	if(check_root_dir(opts.root_dir) != 0) {
+		goto err2;
+	}
+
 	if(open_logfile(opts.root_dir) != 0) {
 		goto err1;
 	}
@@ -95,11 +100,6 @@ int chat_server(int argc, char **argv) {
 	/* TODO: loading of the database and initialization of the delivery queues */
 	if(load_server_key(opts.keyfile, password, &server_key) != 0) {
 		goto err1;
-	}
-
-	/* make sure we have a root directory */
-	if(check_root_dir(opts.root_dir) != 0) {
-		goto err2;
 	}
 
 	/* load up the database */
