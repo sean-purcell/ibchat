@@ -480,7 +480,7 @@ int add_handler(struct client_handler *handler) {
 
 	while(*loc != NULL) {
 		/* don't tolerate duplicates */
-		if(memcmp((*loc)->id, handler->id, 32) != 0) {
+		if(memcmp((*loc)->id, handler->id, 32) == 0) {
 			ret = 1;
 			goto exit;
 		}
