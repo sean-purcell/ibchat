@@ -18,6 +18,7 @@ struct cmessage *new_messages;
 int select_conversation(struct account *acc);
 int start_conversation(struct friend *f);
 
+int cfile_check(struct friend *f);
 int cfile_init(struct friend *f);
 int cfile_add(struct friend *f, struct cmessage *m);
 struct cmessage *cfile_load(struct friend *f);

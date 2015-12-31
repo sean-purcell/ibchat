@@ -20,9 +20,10 @@
 #include "conversation.h"
 #include "termctl.h"
 #include "ibchat_client.h"
+#include "uname.h"
+#include "bg_manager.h"
 
 int select_conversation(struct account *acc) {
-	start_conversation(NULL);
 	/* list friends so one can be selected */
 	acquire_readlock(&lock);
 	int fnum = 0;
@@ -64,7 +65,7 @@ void repaint_conv(struct friend *f, struct cmessage *head) {
 	
 }
 
-int start_conversation(struct friend *f) {
+int start_conversation_graphic(struct friend *f) {
 	cur_conv = f;
 	new_messages = NULL;
 	set_mode(1);
@@ -89,6 +90,232 @@ int start_conversation(struct friend *f) {
 	new_messages = NULL;
 }
 
+static int cmessage_send_server(struct friend *f, struct cmessage *m) {
+	int ret = -1;
+
+	uint64_t mlen = strlen(m->text);
+	uint64_t tlen = 0x11 + mlen + 0x20;
+
+	uint8_t *buf = malloc(tlen);
+	if(buf == NULL) {
+		ERR("failed to allocate memory");
+		tlen = 0;
+		goto err;
+	}
+
+	/* handle the nonce increment */
+	f->s_nonce += 1;
+	if(f->s_nonce == 0) {
+		ERR("too many messages with one friend");
+		goto err;
+	}
+
+	/* prepare message */
+	uint8_t *ptr = buf;
+	*ptr = 0; ptr++;
+	gen_uid(f->uname, ptr); ptr += 0x20;
+	encbe64(tlen - 0x29, ptr); ptr += 8;
+
+	*ptr = 0; ptr++;
+
+	encbe64(f->s_nonce, ptr); ptr += 8;
+
+	encbe64(mlen, ptr); ptr += 8;
+
+	chacha_enc(f->s_symm_key, 32, f->s_nonce, (uint8_t*)m->text, ptr, mlen);
+	ptr += mlen;
+
+	hmac_sha256(f->s_hmac_key, 32, buf, tlen - 0x20, ptr);
+	ptr += 0x20;
+
+	if(ptr - buf != tlen) {
+		ERR("invalid message length");
+	}
+
+	if(acquire_netlock() != 0) {
+		goto err;
+	}
+
+	if(send_message(sc.ch, &sc.keys, buf, tlen) != 0) {
+		ERR("failed to send message");
+		release_netlock();
+		goto err;
+	}
+
+	release_netlock();
+
+	ret = 0;
+err:
+	zfree(buf, tlen);
+
+	return ret;
+}
+
+static int cmessage_send(struct friend *f, char *text, struct cmessage *head) {
+	int ret = -1;
+
+	uint64_t len = strlen(text);
+
+	struct cmessage *m = alloc_cmessage(len);
+	m->sender = 0;
+	strcpy(m->text, text);
+
+	m->next = NULL;
+	m->prev = NULL;
+
+	if(cmessage_send_server(f, m) != 0) {
+		goto err;
+	}
+	if(cfile_add(f, m) != 0) {
+		goto err;
+	}
+
+	m->prev = head;
+	if(head) {
+		head->next = m;
+	}
+
+	ret = 0;
+err:
+	if(ret) free_cmessage(m);
+
+	return ret;
+}
+
+int start_conversation(struct friend *f) {
+#define PRINT_MESSAGE(__mess) do {\
+	char *sender;\
+	if(__mess->sender == 0) {\
+		sender = acc->uname;\
+	} else {\
+		sender = f->uname;\
+	}\
+	printf("%s: %s\n", sender, __mess->text);\
+} while(0);
+
+	int ret = -1;
+
+	acquire_writelock(&lock);
+	cur_conv = f;
+	new_messages = NULL;
+	set_mode_no_lock(1);
+	release_writelock(&lock);
+
+	struct cmessage *messages = NULL;
+	struct cmessage *head = NULL;
+
+	if(cfile_check(f) != 0) {
+		goto err;
+	}
+	messages = cfile_load(f);
+	if(messages == NULL) {
+		goto err;
+	}
+
+	/* print out all previous messages */
+	{
+		struct cmessage *cur = messages;
+		while(cur != NULL) {
+			PRINT_MESSAGE(cur);
+			head = cur;
+			cur = cur->next;
+		}
+	}
+
+	while(1) {
+		/* conversation loop */
+		fd_set fds;
+		{
+			/* wait for stdin */
+			FD_SET(STDIN_FILENO, &fds);
+			struct timeval wait;
+			wait.tv_sec = 0;
+			wait.tv_usec = 500000L;
+
+			select(STDIN_FILENO + 1, &fds, NULL, NULL, &wait);
+		}
+		if(FD_ISSET(STDIN_FILENO, &fds)) {
+			/* get new message and process it */
+			char *text = line_prompt(NULL, NULL, 0);
+			if(text == NULL) {
+				goto err;
+			}
+
+			if(text[0] == '\0') {
+				/* empty message, ignore */
+			} else if(text[0] == '/') {
+				/* command, process */
+				if(strcmp(text, "/exit") == 0) {
+					goto end;
+				} else {
+					printf("unrecognized command\n");
+				}
+			} else {
+				/* new message */
+				if(cmessage_send(f, text, head) != 0) {
+					goto err;
+				}
+			}
+		}
+
+		acquire_writelock(&lock);
+		if(new_messages != NULL) {
+			/* new messages are from most recent to most distant */
+			struct cmessage *cur = new_messages;
+			while(cur->next != NULL) {
+				cur = cur->next;
+			}
+			/* now read them in reverse */
+			while(cur != NULL) {
+				PRINT_MESSAGE(cur);
+				if(cfile_add(f, cur) != 0) {
+					goto mprocesserr;
+				}
+				struct cmessage *next = cur->prev;
+				cur->prev = head;
+				cur->next = NULL;
+				head->next = cur;
+				head = cur;
+				cur = next;
+			}
+			goto mprocessdone;
+			mprocesserr:
+			release_writelock(&lock);
+			goto err;
+			mprocessdone:;
+		}
+		release_writelock(&lock);
+	}
+
+end:;
+	ret = 0;
+err:;
+	free_cmessage_list(messages);
+	set_mode(0);
+	return ret;
+}
+
+int cfile_check(struct friend *f) {
+	FILE *file = NULL;
+	char *path = NULL;
+
+	path = file_path(f->c_file);
+	if(path == NULL) {
+		goto err;
+	}
+	file = fopen(path, "rb");
+
+	int exists = file != NULL;
+
+	fclose(file);
+	free(path);
+
+	return exists ? 0 : cfile_init(f);
+
+err:
+	return -1;
+}
+
 int cfile_init(struct friend *f) {
 	acquire_writelock(&lock);
 	int ret = 0;
@@ -98,6 +325,10 @@ int cfile_init(struct friend *f) {
 
 	path = file_path(f->c_file);
 	if(path == NULL) {
+		goto err;
+	}
+	file = fopen(path, "wb");
+	if(file == NULL) {
 		goto err;
 	}
 

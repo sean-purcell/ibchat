@@ -22,6 +22,7 @@ char *ROOT_DIR = "~/.ibchat/";
 int userfile_dirty = 0;
 
 int debug_mode = 0;
+int log_on = 0;
 
 static FILE *lgf;
 
@@ -50,12 +51,13 @@ int deinit() {
 static int process_opts(int argc, char **argv) {
 	struct option long_opts[] = {
 		{ "debug", no_argument, 0, 'd' },
+		{ "log", no_argument, 0, 'l'},
 		{ 0, 0, 0, 0 },
 	};
 
 	while(1) {
 		int opt_index = 0;
-		int c = getopt_long(argc, argv, "d", long_opts, &opt_index);
+		int c = getopt_long(argc, argv, "dl", long_opts, &opt_index);
 		if(c == -1) {
 			break;
 		}
@@ -64,6 +66,10 @@ static int process_opts(int argc, char **argv) {
 		case 'd':
 			printf("debug mode enabled\n");
 			debug_mode = 1;
+			break;
+		case 'l':
+			printf("logging enabled\n");
+			log_on = 1;
 			break;
 		case '?':
 			return -1;
@@ -133,27 +139,29 @@ static int set_umask() {
 }
 
 static int open_logfile() {
-	/* lgf should point to the .ibchat/ibchat.log */
-	char *pathend = "/ibchat.log";
-	size_t len = strlen(ROOT_DIR) + strlen(pathend) + 1;
-	char *path = malloc(len);
-	if(path == NULL) {
-		fprintf(stderr, "failed to allocate memory\n");
-		return -1;
-	}
-	strcpy(path, ROOT_DIR);
-	strcat(path, pathend);
+	if(log_on) {
+		/* lgf should point to the .ibchat/ibchat.log */
+		char *pathend = "/ibchat.log";
+		size_t len = strlen(ROOT_DIR) + strlen(pathend) + 1;
+		char *path = malloc(len);
+		if(path == NULL) {
+			fprintf(stderr, "failed to allocate memory\n");
+			return -1;
+		}
+		strcpy(path, ROOT_DIR);
+		strcat(path, pathend);
 
-	lgf = fopen(path, "a");
-	if(lgf == NULL) {
-		fprintf(stderr, "failed to open log file\n");
+		lgf = fopen(path, "a");
+		if(lgf == NULL) {
+			fprintf(stderr, "failed to open log file\n");
+			free(path);
+			return -1;
+		}
+
 		free(path);
-		return -1;
+
+		set_logfile(lgf);
 	}
-
-	free(path);
-
-	set_logfile(lgf);
 	set_debug_mode(debug_mode);
 
 	return 0;
