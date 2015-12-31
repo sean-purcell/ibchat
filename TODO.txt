@@ -1,3 +1,7 @@
+Important things to do:
+message sanitization (limit to printable ascii characters)
+message timestamps (we can just do GMT unix time and convert on display)
+
 Minor things to add that will be forgotten:
 Userfile backups
 Account shutdown in the case of hijacks
