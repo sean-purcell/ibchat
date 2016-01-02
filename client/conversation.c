@@ -335,7 +335,6 @@ int cfile_init(struct friend *f) {
 	uint8_t buf[0x30];
 	encbe64(0x30, &buf[0]);
 	encbe64(0x00, &buf[8]);
-	chacha_enc(f->f_symm_key, 32, 0, buf, buf, 16);
 	hmac_sha256(f->f_hmac_key, 32, buf, 16, &buf[16]);
 
 	if(fwrite(buf, 1, 0x30, file) != 0x30) {
