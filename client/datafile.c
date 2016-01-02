@@ -228,6 +228,7 @@ int read_datafile(char *path, void *arg, void **data, struct format_desc *f) {
 
 		cur = (void **) ((char*)(*cur) + f->next_off);
 	}
+	*cur = NULL;
 	if(i != payload_num) {
 		ERR("read num does not match expected");
 		goto err;
