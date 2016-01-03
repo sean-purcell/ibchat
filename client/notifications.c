@@ -297,7 +297,7 @@ uint8_t *notif_bin_write(struct notif *n, uint8_t *ptr) {
 	ptr++;
 	switch(n->type) {
 	case 1:
-		memcpy(ptr, n->fr->c_file, 0x20); ptr += 0x20;
+		memcpy(ptr, n->fr->uid, 0x20); ptr += 0x20;
 		encbe64(n->nunread, ptr); ptr += 8;
 		break;
 	case 2:
@@ -309,7 +309,7 @@ uint8_t *notif_bin_write(struct notif *n, uint8_t *ptr) {
 			ptr += n->freq->k_len;
 		break;
 	case 3:
-		memcpy(ptr, n->fr->c_file, 0x20); ptr += 0x20;
+		memcpy(ptr, n->fr->uid, 0x20); ptr += 0x20;
 		break;
 	}
 
@@ -332,7 +332,7 @@ uint8_t *notif_bin_parse(struct account *acc, struct notif **_n, uint8_t *ptr) {
 	case 3:
 		f = acc->friends;
 		while(f) {
-			if(memcmp(f->c_file, ptr, 0x20) == 0) {
+			if(memcmp(f->uid, ptr, 0x20) == 0) {
 				n->fr = f;
 				break;
 			}

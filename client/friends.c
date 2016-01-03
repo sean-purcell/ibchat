@@ -21,6 +21,7 @@
 #include "friends.h"
 #include "datafile.h"
 #include "cli.h"
+#include "uname.h"
 
 static int ff_p_fill(void *_arg, uint8_t *ptr) {
 	return 0;
@@ -82,6 +83,8 @@ struct friend *init_friend(char *uname, uint8_t *pkey,
 	memcpy(f->pkey, pkey, k_len);
 	f->u_len = u_len;
 	f->k_len = k_len;
+
+	gen_uid(f->uname, f->uid);
 
 	f->s_nonce = 0;
 	f->r_nonce = 0;
@@ -259,6 +262,8 @@ uint8_t *friend_parse_bin(struct friend **_f, uint8_t *ptr) {
 
 	memcpy(f->uname, ptr, f->u_len); ptr += f->u_len;
 	f->uname[f->u_len] = '\0';
+
+	gen_uid(f->uname, f->uid);
 
 	memcpy(f->pkey, ptr, f->k_len); ptr += f->k_len;
 

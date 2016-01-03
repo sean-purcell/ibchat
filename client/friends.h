@@ -11,6 +11,8 @@ struct friend {
 	char *uname;
 	uint8_t *pkey;
 
+	uint8_t uid[32];
+
 	uint8_t c_file[32];
 
 	uint8_t f_symm_key[32];

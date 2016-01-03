@@ -17,7 +17,7 @@ type:
 
 1
 -
-0x001-0x021 friend c_file (an easily available identifier)
+0x001-0x021 friend uid
 0x021-0x029 number of unread
 
 2
@@ -29,7 +29,7 @@ type:
 
 3
 -
-0x001-0x021 friend c_file (an easily available identifier)
+0x001-0x021 friend uid
 
 encryption key:
 sha256(symm_key || message_salt)
