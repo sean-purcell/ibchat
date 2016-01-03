@@ -17,6 +17,7 @@
 #include "login_server.h"
 #include "cli.h"
 #include "friendreq.h"
+#include "conversation.h"
 
 pthread_t bg_manager;
 
@@ -64,8 +65,7 @@ int add_umessage(struct message *m) {
 	switch(type) {
 	case 0:
 		/* typical message from friend */
-		ERR("NOT IMPLEMENTED: %s:%d", __FILE__, __LINE__);
-		ret = -1;
+		ret = parse_conv_message(sender, payload, p_len);
 		break;
 	case 1:
 		/* friend request */

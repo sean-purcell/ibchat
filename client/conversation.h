@@ -18,6 +18,8 @@ struct cmessage *new_messages;
 int select_conversation(struct account *acc);
 int start_conversation(struct friend *f);
 
+int parse_conv_message(uint8_t *sender, uint8_t *payload, uint64_t plen);
+
 int cfile_check(struct friend *f);
 int cfile_init(struct friend *f);
 int cfile_add(struct friend *f, struct cmessage *m);

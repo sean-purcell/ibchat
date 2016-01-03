@@ -281,3 +281,7 @@ int get_mode() {
 	return v;
 }
 
+int get_mode_no_lock() {
+	return mode;
+}
+

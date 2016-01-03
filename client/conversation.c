@@ -128,7 +128,7 @@ static int cmessage_send_server(struct friend *f, struct cmessage *m) {
 	chacha_enc(f->s_symm_key, 32, f->s_nonce, (uint8_t*)m->text, ptr, mlen);
 	ptr += mlen;
 
-	hmac_sha256(f->s_hmac_key, 32, buf, tlen - 0x20, ptr);
+	hmac_sha256(f->s_hmac_key, 32, &buf[0x29], tlen - 0x49, ptr);
 	ptr += 0x20;
 
 	if(ptr - buf != tlen) {
@@ -299,6 +299,128 @@ err:;
 	return ret;
 }
 
+static int parse_conv_message_payload(struct friend *f,
+	uint8_t *payload, uint64_t plen,
+	struct cmessage **m);
+
+int parse_conv_message(uint8_t *sender, uint8_t *payload, uint64_t plen) {
+	int ret = -1, inv = -1;
+
+	struct friend *f = NULL;
+	struct cmessage *m = NULL;
+
+	/* first see if we have a friend with the given id */
+	f = acc->friends;
+	while(f) {
+		if(memcmp(f->uid, sender, 32) == 0) {
+			break;
+		}
+		f = f->next;
+	}
+	if(f == NULL) {
+		LOG("message sender unidentified");
+		/* not found, invalid message */
+		goto inv;
+	}
+
+	int res = parse_conv_message_payload(f, payload, plen, &m);
+	if(res < 0) {
+		ERR("failed to parse message");
+		goto err;
+	} else if(res > 0) {
+		ERR("invalid message, discarded");
+		goto inv;
+	}
+
+	/* add it to the conversation file */
+	if(cfile_add(f, m) != 0) {
+		ERR("failed to add to conversation file");
+		goto err;
+	}
+
+	/* if we're in conversation add to current conversation */
+	acquire_readlock(&lock);
+	if(get_mode_no_lock() == 1) {
+		if(cur_conv == f) {
+			m->next = new_messages;
+			if(new_messages) new_messages->prev = m;
+			new_messages = m;
+		}
+	}
+	release_readlock(&lock);
+
+	inv = 0;
+inv:
+	ret = 0;
+err:
+	return ret;
+}
+
+static int parse_conv_message_payload(struct friend *f,
+	uint8_t *payload, uint64_t plen,
+	struct cmessage **_m) {
+
+	int ret = -1, inv = -1;
+
+	uint8_t macc[0x20], *macf;
+
+	uint64_t mlen, nonce;
+
+	struct cmessage *m = NULL;
+
+	if(plen < 0x11) {
+		LOG("invalid message length");
+		goto inv;
+	}
+
+	mlen = decbe64(&payload[0x9]);
+	if(plen != 0x11 + mlen + 0x20) {
+		LOG("invalid message length field");
+		goto inv;
+	}
+
+	nonce = decbe64(&payload[0x1]);
+	if(nonce <= f->r_nonce) {
+		LOG("invalid nonce");
+		goto inv;
+	}
+	f->r_nonce = nonce;
+
+	macf = &payload[plen - 0x20];
+	hmac_sha256(f->r_hmac_key, 32, payload, plen - 32, macc);
+
+	if(memcmp_ct(macf, macc, 0x20) != 0) {
+		LOG("invalid message authentication");
+		goto inv;
+	}
+
+	m = alloc_cmessage(mlen);
+	if(m == NULL) {
+		ERR("failed to allocate memory");
+		goto err;
+	}
+
+	m->sender = 1;
+	chacha_dec(f->r_symm_key, 32, f->r_nonce, &payload[0x11],
+		(uint8_t *) m->text, mlen);
+
+	m->next = NULL;
+	m->prev = NULL;
+
+	/* we're done */
+	*_m = m;
+
+	inv = 0;
+inv:
+	ret = 0;
+err:
+	/* cleanup */
+	memsets(macc, 0, sizeof(macc));
+	if((ret || inv) && m) free_cmessage(m);
+
+	return ret ? -1 : (inv ? 1 : 0);
+}
+
 /* defines the first set of 32 bytes used for the MAC of the first message */
 static uint8_t INITIAL_PREV_MAC[32] = {
 	 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
@@ -447,6 +569,7 @@ int cfile_load(struct friend *f, struct cmessage **messages) {
 		}
 
 		READ((*loc)->text, mlen);
+		(*loc)->sender = sender;
 
 		{
 			hmac_sha256_init(&hctx, f->f_hmac_key, 32);
@@ -479,6 +602,9 @@ int cfile_load(struct friend *f, struct cmessage **messages) {
 
 		chacha_final(&cctx);
 	}
+
+	/* nullify the final next field */
+	*loc = NULL;
 
 	if(pos != flen) {
 		ERR("conversation file invalid");
