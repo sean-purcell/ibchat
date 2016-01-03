@@ -154,7 +154,7 @@ err:
 	return ret;
 }
 
-static int cmessage_send(struct friend *f, char *text, struct cmessage *head) {
+static int cmessage_send(struct friend *f, char *text, struct cmessage **head) {
 	int ret = -1;
 
 	uint64_t len = strlen(text);
@@ -173,10 +173,11 @@ static int cmessage_send(struct friend *f, char *text, struct cmessage *head) {
 		goto err;
 	}
 
-	m->prev = head;
-	if(head) {
-		head->next = m;
+	m->prev = *head;
+	if(*head) {
+		(*head)->next = m;
 	}
+	*head = m;
 
 	ret = 0;
 err:
@@ -256,9 +257,12 @@ int start_conversation(struct friend *f) {
 				}
 			} else {
 				/* new message */
-				if(cmessage_send(f, text, head) != 0) {
+				if(cmessage_send(f, text, &head) != 0) {
 					goto err;
 				}
+				/* overwrite the display'ed version */
+				printf("\033[1A");
+				PRINT_MESSAGE(head);
 			}
 		}
 
@@ -271,7 +275,9 @@ int start_conversation(struct friend *f) {
 			}
 			/* now read them in reverse */
 			while(cur != NULL) {
+				printf("\033[1G\n\033[1A");
 				PRINT_MESSAGE(cur);
+				printf("\033[1B");
 				struct cmessage *next = cur->prev;
 				cur->prev = head;
 				cur->next = NULL;
