@@ -272,9 +272,6 @@ int start_conversation(struct friend *f) {
 			/* now read them in reverse */
 			while(cur != NULL) {
 				PRINT_MESSAGE(cur);
-				if(cfile_add(f, cur) != 0) {
-					goto mprocesserr;
-				}
 				struct cmessage *next = cur->prev;
 				cur->prev = head;
 				cur->next = NULL;
@@ -282,11 +279,7 @@ int start_conversation(struct friend *f) {
 				head = cur;
 				cur = next;
 			}
-			goto mprocessdone;
-			mprocesserr:
-			release_writelock(&lock);
-			goto err;
-			mprocessdone:;
+			new_messages = NULL;
 		}
 		release_writelock(&lock);
 	}
