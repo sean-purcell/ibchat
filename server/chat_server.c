@@ -22,6 +22,7 @@
 
 #include "client_handler.h"
 #include "user_db.h"
+#include "undelivered.h"
 #include "../crypto/keyfile.h"
 #include "../inet/connect.h"
 #include "../util/line_prompt.h"
@@ -104,6 +105,10 @@ int chat_server(int argc, char **argv) {
 
 	/* load up the database */
 	if(user_db_init(opts.root_dir) != 0) {
+		goto err2;
+	}
+
+	if(undel_init(opts.root_dir) != 0) {
 		goto err3;
 	}
 
@@ -132,6 +137,7 @@ int chat_server(int argc, char **argv) {
 err4:
 	close(server_socket.fd);
 err3:
+	user_db_destroy();
 err2:
 err1:
 	fclose(lgf);

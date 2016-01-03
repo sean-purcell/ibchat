@@ -48,6 +48,8 @@ struct ch_manager {
 };
 
 void *client_handler(void *_arg);
+static int send_undelivered(uint8_t *id, struct ch_manager *c_mgr,
+	struct keyset *keys);
 static int client_handle_loop(struct client_handler *c_hndl,
 	struct ch_manager *c_mgr, struct keyset *keys);
 static int handle_message(struct message *m, struct client_handler *c_hndl);
@@ -194,11 +196,11 @@ void *client_handler(void *_arg) {
 	pthread_cleanup_push(ht_cleanup_end_handler, &c_hndl);
 
 	/* TODO: implement undelivered */
-	//if(send_undelivered(c_hndl.id, c_mgr.handler, &keys) != 0) {
-	//	ERR("%d: failed to send undelivered messages", fd);
+	if(send_undelivered(c_hndl.id, &c_mgr, &keys) != 0) {
+		ERR("%d: failed to send undelivered messages", fd);
 		/* this is an acceptable error
 		 * we can continue to interact with the user */
-	//}
+	}
 
 	if(client_handle_loop(&c_hndl, &c_mgr, &keys) != 0) {
 		goto err5;
@@ -217,6 +219,35 @@ err1:
 	return NULL;
 }
 
+static int send_undelivered(uint8_t *id, struct ch_manager *c_mgr,
+	struct keyset *keys) {
+
+	struct user *u = user_db_get(id);
+	if(u == NULL) {
+		return -1;
+	}
+
+	struct umessage *messages;
+	if(undel_load(u, &messages) != 0) {
+		return -1;
+	}
+
+	while(messages) {
+		LOG("%d: sending undel message of length %llu",
+			c_mgr->fd, messages->len);
+		if(send_message(c_mgr->handler, keys,
+			messages->message, messages->len) != 0) {
+
+			free_umessage_list(messages);
+			return -1;
+		}
+		struct umessage *next = messages->next;
+		free_umessage(messages);
+		messages = next;
+	}
+
+	return 0;
+}
 
 static int client_handle_loop(struct client_handler *c_hndl,
 	struct ch_manager *c_mgr, struct keyset *keys) {
@@ -272,7 +303,7 @@ static int handle_message(struct message *m, struct client_handler *c_hndl) {
 		struct client_handler *t_hndl = get_handler(uid);
 		if(t_hndl == NULL) {
 			/* user not logged in */
-			if(add_undelivered_message(u, resp, resplen) != 0) {
+			if(undel_add_message(u, resp, resplen) != 0) {
 				ERR("%d: failed to add to undel "
 				"file", c_hndl->fd);
 				return -1;

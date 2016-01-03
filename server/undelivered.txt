@@ -1,0 +1,15 @@
+Undelivered File Format
+=======================
+
+0x000-0x008 File offset of the end, for easy writing
+0x008-0x010 Number of messages
+0x010-0x030 hmacsha256 of the first two fields
+0x030-END messages as shown below
+
+Message format:
+
+0x000-0x008 Message length
+0x008-    X Message content
+    X-X +32 hmacsha256 of previous end mac || message block
+(first message uses special previous mac, see undelivered.c)
+

@@ -645,6 +645,13 @@ int cfile_add(struct friend *f, struct cmessage *m) {
 	}\
 	} while(0)
 
+#define SEEK(pos) do {\
+	if(fseek(file, pos, SEEK_SET) != 0) {\
+		ERR("failed to seek conversation file");\
+		goto err;\
+	}\
+	} while(0)
+
 #define MACCHK() do {\
 	if(memcmp_ct(macf, macc, 0x20) != 0) {\
 		ERR("conversation file invalid");\
@@ -696,10 +703,11 @@ int cfile_add(struct friend *f, struct cmessage *m) {
 	encbe64(mnum + 1, &buf[8]);
 
 	hmac_sha256(f->f_hmac_key, 32, buf, 16, &buf[16]);
-	fseek(file, 0, SEEK_SET);
+	SEEK(0);
+
 	WRITE(buf, 0x30);
 
-	fseek(file, flen - 32, SEEK_SET);
+	SEEK(flen - 32);
 
 	READ(buf, 0x20);
 	fflush(file);

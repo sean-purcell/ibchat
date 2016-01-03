@@ -8,7 +8,7 @@
 struct user {
 	RSA_PUBLIC_KEY pkey;
 	uint8_t uid[0x20];
-	uint8_t undel[0x20];
+	uint8_t und_auth[0x20];
 };
 
 int user_db_init(char *root_dir);

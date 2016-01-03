@@ -20,7 +20,7 @@
 #include <ibcrypt/rand.h>
 
 #include "user_db.h"
-
+#include "undelivered.h"
 #include "chat_server.h"
 
 #include "../util/lock.h"
@@ -40,6 +40,7 @@ static const char USER_FILE_MAGIC[8] = "userdb\0\0";
 
 struct user_db_ent {
 	struct user u;
+	pthread_mutex_t undel_lock;
 	struct user_db_ent *next;
 };
 
@@ -130,6 +131,10 @@ static int user_db_add_no_write(struct user u) {
 
 	struct user_db_ent *ent = malloc(sizeof(struct user_db_ent));
 	if(ent == NULL) {
+		return 1;
+	}
+	if(pthread_mutex_init(&ent->undel_lock, NULL) != 0) {
+		free(ent);
 		return 1;
 	}
 
@@ -275,7 +280,7 @@ static int parse_user_file(char *name, struct user *user) {
 	/* public keys can be passed by value */
 	user->pkey = pkey;
 	memcpy(user->uid, uid, 0x20);
-	memcpy(user->undel, undelivered, 0x20);
+	memcpy(user->und_auth, undelivered, 0x20);
 
 	int ret = 0;
 	goto exit;
@@ -353,7 +358,7 @@ static int write_user_file(struct user *u) {
 
 	memcpy(magic, USER_FILE_MAGIC, 8);
 	memcpy(uid, u->uid, 0x20);
-	memcpy(undelivered, u->undel, 0x20);
+	memcpy(undelivered, u->und_auth, 0x20);
 	encbe64(rsa_pubkey_bufsize(u->pkey.bits), sizebuf);
 
 	if(rsa_pss_sign(&server_key, buf, sig1 - buf, sig1, sigsize) != 0) {
@@ -487,6 +492,7 @@ void user_db_destroy() {
 		struct user_db_ent *next;
 		while(cur != NULL) {
 			next = cur->next;
+			pthread_mutex_destroy(&cur->undel_lock);
 			free(cur);
 			cur = next;
 		}
@@ -557,41 +563,19 @@ exit:
 	return ret;
 }
 
-static int gen_undel_file(uint8_t *id) {
-	if(cs_rand(id, 0x20) != 0) {
+static int gen_undel_file(struct user *u) {
+	if(cs_rand(u->und_auth, 0x20) != 0) {
 		ERR("failed to generate random numbers");
 		return 1;
 	}
 
-	/* check if the file already exists, in which case our rng is broken */
-	size_t pathlen = strlen(USER_DIR) + 64 + 1;
-	char *path = malloc(pathlen);
-	if(path == NULL) {
-		ERR("failed to allocate memory");
-		return 1;
-	}
-
-	strcpy(path, USER_DIR);
-	to_hex(id, 0x20, &path[strlen(USER_DIR)]);
-
-	struct stat st = {0};
-	if(stat(path, &st) == -1) {
-		if(errno != ENOENT) {
-			ERR("failed to read from undelivered dir: %s", path);
-			return 1;
-		}
-	} else {
-		ERR("RNG unsafe, repeat undel file generated: %s", path);
-		return 1;
-	}
-
-	return 0;
+	return undel_init_file(u);
 }
 
 int user_init(uint8_t *uid, RSA_PUBLIC_KEY pkey, struct user *u) {
 	memcpy(u->uid, uid, 0x20);
 
-	if(gen_undel_file(u->undel) != 0) {
+	if(gen_undel_file(u) != 0) {
 		return 1;
 	}
 
