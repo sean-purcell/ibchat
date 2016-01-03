@@ -21,7 +21,7 @@ int start_conversation(struct friend *f);
 int cfile_check(struct friend *f);
 int cfile_init(struct friend *f);
 int cfile_add(struct friend *f, struct cmessage *m);
-struct cmessage *cfile_load(struct friend *f);
+int cfile_load(struct friend *f, struct cmessage **m);
 
 struct cmessage *alloc_cmessage(uint64_t len);
 void free_cmessage(struct cmessage *m);

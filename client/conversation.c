@@ -71,7 +71,10 @@ int start_conversation_graphic(struct friend *f) {
 	set_mode(1);
 	//int theight = termheight();
 	/* load enough messages to fill the screen */
-	struct cmessage *messages = cfile_load(f);
+	struct cmessage *messages = NULL;
+	if(cfile_load(f, &messages) != 0) {
+		return -1;
+	}
 
 	set_ctl(1);
 	clr_scrn();
@@ -94,7 +97,7 @@ static int cmessage_send_server(struct friend *f, struct cmessage *m) {
 	int ret = -1;
 
 	uint64_t mlen = strlen(m->text);
-	uint64_t tlen = 0x11 + mlen + 0x20;
+	uint64_t tlen = 0x29 + 0x11 + mlen + 0x20;
 
 	uint8_t *buf = malloc(tlen);
 	if(buf == NULL) {
@@ -191,7 +194,7 @@ int start_conversation(struct friend *f) {
 		sender = f->uname;\
 	}\
 	printf("%s: %s\n", sender, __mess->text);\
-} while(0);
+} while(0)
 
 	int ret = -1;
 
@@ -205,10 +208,11 @@ int start_conversation(struct friend *f) {
 	struct cmessage *head = NULL;
 
 	if(cfile_check(f) != 0) {
+		ERR("failed to initialize conversation file");
 		goto err;
 	}
-	messages = cfile_load(f);
-	if(messages == NULL) {
+	if(cfile_load(f, &messages) != 0) {
+		ERR("failed to load conversation file");
 		goto err;
 	}
 
@@ -295,6 +299,12 @@ err:;
 	return ret;
 }
 
+/* defines the first set of 32 bytes used for the MAC of the first message */
+static uint8_t INITIAL_PREV_MAC[32] = {
+	 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
+	16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+};
+
 int cfile_check(struct friend *f) {
 	FILE *file = NULL;
 	char *path = NULL;
@@ -354,7 +364,7 @@ end:
 	return ret;
 }
 
-struct cmessage *cfile_load(struct friend *f) {
+int cfile_load(struct friend *f, struct cmessage **messages) {
 #define READ(buf, len) do {\
 	if(fread(buf, 1, len, file) != len) {\
 		ERR("conversation file read failed");\
@@ -368,6 +378,8 @@ struct cmessage *cfile_load(struct friend *f) {
 		goto err;\
 	}\
 	} while(0)
+
+	int ret = 0;
 
 	acquire_readlock(&lock);
 
@@ -388,8 +400,7 @@ struct cmessage *cfile_load(struct friend *f) {
 		goto err;
 	}
 
-	HMAC_SHA256_CTX octx, hctx;
-	hmac_sha256_init(&octx, f->f_hmac_key, 32);
+	HMAC_SHA256_CTX hctx;
 
 	CHACHA_CTX cctx;
 
@@ -407,7 +418,7 @@ struct cmessage *cfile_load(struct friend *f) {
 	uint64_t flen = decbe64(&buf[0]);
 	uint64_t mnum = decbe64(&buf[8]);
 
-	memcpy(buf, macf, 32);
+	memcpy(buf, INITIAL_PREV_MAC, 32);
 
 	uint64_t pos = 0x30;
 	uint64_t i;
@@ -438,7 +449,7 @@ struct cmessage *cfile_load(struct friend *f) {
 		READ((*loc)->text, mlen);
 
 		{
-			hctx = octx;
+			hmac_sha256_init(&hctx, f->f_hmac_key, 32);
 			hmac_sha256_update(&hctx, &buf[0x20], 16);
 			hmac_sha256_update(&hctx, macf, 0x20);
 			hmac_sha256_update(&hctx, (uint8_t*)(*loc)->text, mlen);
@@ -477,19 +488,21 @@ struct cmessage *cfile_load(struct friend *f) {
 	goto end;
 err:
 	head = NULL;
+	ret = -1;
 end:
 	free(path);
 	if(file) fclose(file);
-	memsets(&octx, 0, sizeof(HMAC_SHA256_CTX));
 	memsets(&hctx, 0, sizeof(HMAC_SHA256_CTX));
 	chacha_final(&cctx);
 
 	memsets(tmp, 0, sizeof(tmp));
 
 	release_readlock(&lock);
-	return head;
+	*messages = head;
+	return ret;
 
 #undef READ
+#undef MACCHK
 }
 
 int cfile_add(struct friend *f, struct cmessage *m) {
@@ -558,12 +571,16 @@ int cfile_add(struct friend *f, struct cmessage *m) {
 	encbe64(mnum + 1, &buf[8]);
 
 	hmac_sha256(f->f_hmac_key, 32, buf, 16, &buf[16]);
+	fseek(file, 0, SEEK_SET);
 	WRITE(buf, 0x30);
 
 	fseek(file, flen - 32, SEEK_SET);
 
 	READ(buf, 0x20);
 	fflush(file);
+	if(mnum == 0) { /* this is the first message, use a different MAC */
+		memcpy(buf, INITIAL_PREV_MAC, 0x20);
+	}
 	encbe64(mlen, &buf[32]);
 	encbe64(m->sender, &buf[40]);
 
@@ -584,8 +601,8 @@ int cfile_add(struct friend *f, struct cmessage *m) {
 	chacha_stream(&cctx, (uint8_t*)m->text, encm, mlen);
 	WRITE(encm, mlen);
 
-	hmac_sha256_init(&hctx, f->f_symm_key, 32);
-	hmac_sha256_update(&hctx, &buf[0x20], 10);
+	hmac_sha256_init(&hctx, f->f_hmac_key, 32);
+	hmac_sha256_update(&hctx, &buf[0x20], 16);
 	hmac_sha256_update(&hctx, macc, 32);
 	hmac_sha256_update(&hctx, encm, mlen);
 	hmac_sha256_final(&hctx, macc);
@@ -606,6 +623,8 @@ end:
 	return ret;
 
 #undef READ
+#undef WRITE
+#undef MACCHK
 }
 
 struct cmessage *alloc_cmessage(uint64_t len) {
