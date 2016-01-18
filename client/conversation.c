@@ -348,6 +348,11 @@ int parse_conv_message(uint8_t *sender, uint8_t *payload, uint64_t plen) {
 	}
 	release_readlock(&lock);
 
+	/* everything is valid, message is parsed, place it in the queue */
+	if(add_new_message(f) != 0) {
+		goto err;
+	}
+
 	inv = 0;
 inv:
 	ret = 0;

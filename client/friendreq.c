@@ -477,6 +477,20 @@ int parse_friendreq_response(uint8_t *sender, uint8_t *payload, uint64_t p_len) 
 		goto err;
 	}
 
+	/* everything is valid, message is parsed, place it in the queue */
+	struct notif *n = malloc(sizeof(struct notif));
+	if(n == NULL) {
+		ERR("failed to allocate memory");
+		goto err;
+	}
+
+	n->type = 3;
+	n->fr = f;
+
+	n->next = NULL;
+
+	add_notif(n);
+
 	inv = 0;
 end:
 	ret = 0;

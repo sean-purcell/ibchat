@@ -193,6 +193,40 @@ int add_notif(struct notif *n) {
 	return 0;
 }
 
+int add_new_message(struct friend *f) {
+	int ret = -1;
+	acquire_writelock(&lock);
+	struct notif *cur = notifs;
+	while(cur) {
+		if(cur->type == 1 && cur->fr == f) {
+			cur->nunread++;
+			break;
+		}
+	}
+	release_writelock(&lock);
+	if(cur != NULL) {
+		ret = write_notiffile(acc, notifs);
+	} else {
+		struct notif *n = malloc(sizeof(struct notif));
+		if(n == NULL) {
+			ERR("failed to allocate memory");
+			goto err;
+		}
+
+		n->type = 1;
+		n->nunread = 1;
+		n->fr = f;
+
+		n->next = NULL;
+
+		ret = insert_notif(n);
+		if(get_mode() == 0) set_mode(0xff);
+	}
+
+err:
+	return ret;
+}
+
 int insert_notif(struct notif *n) {
 	int ret = 0;
 	acquire_writelock(&lock);

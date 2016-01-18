@@ -30,6 +30,7 @@ int notiflist_len(struct notif *n);
 void notiflist_free(struct notif *n);
 void notif_free(struct notif *n);
 int add_notif(struct notif *n);
+int add_new_message(struct friend *f);
 int insert_notif(struct notif *n);
 
 int view_notifs(struct account *acc);
