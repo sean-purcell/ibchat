@@ -664,6 +664,8 @@ int cfile_add(struct friend *f, struct cmessage *m) {
 	}\
 	} while(0)
 
+	if(cfile_check(f) != 0) return -1;
+
 	int ret = 0;
 
 	acquire_writelock(&lock);

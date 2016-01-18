@@ -179,7 +179,7 @@ void print_notif(struct notif *n, int num) {
 			num, n->freq->uname);
 		break;
 	case 3:
-		printf("%d: %s accepted your friend request\n",
+		printf("%4d: %s accepted your friend request\n",
 			num, n->fr->uname);
 		break;
 	}
