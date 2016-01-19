@@ -22,7 +22,7 @@
 /* don't import the whole file just for this */
 extern uint64_t utime(struct timeval tv);
 
-//#define HANDSHAKE_DEBUG
+#define HANDSHAKE_DEBUG
 
 #ifdef HANDSHAKE_DEBUG
 # define HS_TRACE() do { ERR("ERROR: %d", __LINE__); } while(0);
@@ -206,6 +206,10 @@ int server_handshake(struct con_handle *con, RSA_KEY *rsa_key, struct keyset *ke
 		return -1;
 	}
 
+#ifdef HANDSHAKE_DEBUG
+	LOG("sending server handshake response message");
+#endif
+	
 	server_m->seq_num = 0;
 	/* message constructed, fire away */
 	add_message(con, server_m);

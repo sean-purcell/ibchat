@@ -21,7 +21,7 @@
 
 #include "../util/log.h"
 
-//#define PROTO_DEBUG
+#define PROTO_DEBUG
 
 #define WAIT_TIMEOUT (10000000ULL)
 #define ACK_WAITTIME (100000000ULL)
