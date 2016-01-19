@@ -49,6 +49,12 @@ $(OBJECTDIR)/%.o: %.c $(OBJECTDIR)
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR) $(BUILDDIRS) $(OBJECTDIR)
 
+install-server: server
+	cp bin/ibchat-server /usr/local/bin/ibchat-server
+
+install: client
+	cp bin/ibchat /usr/local/bin/ibchat
+
 clean:
 	rm -r bin
 
