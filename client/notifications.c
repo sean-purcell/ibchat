@@ -172,7 +172,7 @@ void print_notif(struct notif *n, int num) {
 	switch(n->type) {
 	case 1:
 		printf("%4d: %llu unread messages from %s\n",
-			num, n->nunread, n->fr->uname);
+			num, (long long unsigned) n->nunread, n->fr->uname);
 		break;
 	case 2:
 		printf("%4d: friend request from %s\n",
