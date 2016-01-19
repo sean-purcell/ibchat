@@ -27,7 +27,7 @@ static void fmt_time() {
 	tm_info = localtime(&tv.tv_sec);
 
 	strftime(time, 26, "%Y-%m-%d %H:%M:%S", tm_info);
-	sprintf(time_str, "%s:%.3d - ", time, tv.tv_usec / 1000);
+	sprintf(time_str, "%s:%.3d - ", time, (int)tv.tv_usec / 1000);
 }
 
 static void write_to_file(FILE *f, int time, char *format, va_list args) {
