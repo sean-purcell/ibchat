@@ -12,7 +12,7 @@ I wrote it for fun to practice writing secure software, and so its written entir
 Clone the repository at [https://github.com/iburinoc/ibchat](https://github.com/iburinoc/ibchat) or [download the zip](https://github.com/iburinoc/ibchat/archive/master.zip), and once in the ibchat directory run
 
 {% highlight bash %}
-make
+make client
 sudo make install
 {% endhighlight %}
 
