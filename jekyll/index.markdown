@@ -5,7 +5,7 @@ title: ibchat
 
 ibchat is an end-to-end encrypted messaging program that runs through a centralized server for convenience of key-distribution and message delivery, without requiring trust of anyone, including the server, but the people you want to talk to.
 
-I wrote it for fun to practice writing secure software, and so its written entirely from scratch in C, which sounds like a security nightmare, and it is.  Therefore, you really shouldn't use this for anything real, but feel free to [read the code](https://github.com/iburinoc/ibchat) and let me know if you find any security holes :)
+I wrote it for fun to practice writing secure software, and so its written entirely from scratch in C, which sounds like a security nightmare, and it is (which helped me learn a lot).  Therefore, you really shouldn't use this for anything you need to be actually secure (if you want NSA protection look into GPG), but feel free to [read the code](https://github.com/iburinoc/ibchat) and let me know if you find any security holes :)
 
 ## Installation 
 
