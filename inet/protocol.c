@@ -309,7 +309,7 @@ void *handle_connection(void *_con) {
 		 */
 		{
 #endif
-			ret = pthread_mutex_trylock(&con->out_mutex);
+			ret = pthread_mutex_lock(&con->out_mutex);
 			if(ret != 0) {
 				if(ret != EBUSY) {
 #ifdef PROTO_DEBUG
@@ -318,8 +318,6 @@ void *handle_connection(void *_con) {
 #endif
 					goto error;
 				}
-
-				goto endwrite;
 			}
 
 			if(con->out_queue.size > 0) {
