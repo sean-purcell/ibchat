@@ -150,7 +150,6 @@ void ht_cleanup_end_handler(void *_arg) {
 void *client_handler(void *_arg) {
 	struct client_handler c_hndl;
 	struct ch_manager c_mgr;
-	pthread_t ch_thread;
 	struct keyset keys;
 
 	int ret, fd;
@@ -164,7 +163,7 @@ void *client_handler(void *_arg) {
 	}
 
 	/* initiate the connection handler thread */
-	if(launch_handler(&ch_thread, &c_mgr.handler, fd) != 0) {
+	if(launch_handler(&c_mgr.thread, &c_mgr.handler, fd) != 0) {
 		ERR("%d: failed to launch handler thread", fd);
 		goto err2;
 	}
