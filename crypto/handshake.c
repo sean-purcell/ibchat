@@ -22,7 +22,7 @@
 /* don't import the whole file just for this */
 extern uint64_t utime(struct timeval tv);
 
-#define HANDSHAKE_DEBUG
+//#define HANDSHAKE_DEBUG
 
 #ifdef HANDSHAKE_DEBUG
 # define HS_TRACE() do { ERR("ERROR: %d", __LINE__); } while(0);
