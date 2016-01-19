@@ -1,21 +1,30 @@
 ---
 layout: page
-title: Material Jekyll Theme
+title: ibchat
 ---
-Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis [nostrud exercitation](http://alexcarpenter.me) ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
-## Heading Level 2
+ibchat is an end-to-end encrypted messaging program that runs through a centralized server for convenience of key-distribution and message delivery, without requiring trust of anyone, including the server, but the people you want to talk to.
 
-Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+I wrote it for fun to practice writing secure software, and so its written entirely from scratch in C, which sounds like a security nightmare, and it is.  Therefore, you really shouldn't use this for anything real, but feel free to [read the code](https://github.com/iburinoc/ibchat) and let me know if you find any security holes :)
 
-{% highlight scss %}
-  .header {
-    font-size: 100px;
-  }
+## Installation 
+
+Clone the repository at [https://github.com/iburinoc/ibchat](https://github.com/iburinoc/ibchat) or [download the zip](https://github.com/iburinoc/ibchat/archive/master.zip), and once in the ibchat directory run
+
+{% highlight bash %}
+make
+sudo make install
 {% endhighlight %}
 
-### Heading Level 3
+### Security
 
-> Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.
+The user data files should be completely secure, even to anyone who has read/write access to your computer, as they're all encrypted.  When you connect to a server for the first time, make sure you verify the server's public key with a trusted source.  If using the default server (ibchat.seanp.xyz), the public key signature must match
 
-Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+{% highlight bash %}
+INSERT HERE
+{% endhighlight %}
+
+If it doesn't, do not accept the server's public key, as it is an impersonation attempt!
+
+The same holds for adding friends.  Since the server doesn't know your username, only the sha256 hash of it, it cannot provide a list of users, so you must communicate with a friend beforehand to get their username.  When adding friends, you should verify their public key signature with them before accepting the request.  You can see your own public key signature in the header in the main menu.
+
