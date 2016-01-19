@@ -1,5 +1,2 @@
-Ibchat
-======
-An encrypted chat program built with ibcrypt.
-Likely not actually secure, through timing attacks, etc.
+[https://ibchat.seanp.xyz](https://ibchat.seanp.xyz)
 
