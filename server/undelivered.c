@@ -243,7 +243,6 @@ int undel_load(struct user *u, struct umessage **messages) {
 
 	MACCHK();
 
-	uint64_t flen = decbe64(&prefix[0]);
 	uint64_t mnum = decbe64(&prefix[8]);
 
 	memcpy(prev_mac, INITIAL_PREV_MAC, 0x20);
@@ -285,7 +284,6 @@ err:
 	memsets(prev_mac, 0, sizeof(prev_mac));
 	memsets(len_buf, 0, sizeof(len_buf));
 	memsets(&hctx, 0, sizeof(hctx));
-	flen = 0;
 	mnum = 0;
 	fclose(f);
 
