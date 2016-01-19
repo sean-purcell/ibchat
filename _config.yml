@@ -1,0 +1,23 @@
+# Site settings
+title: ibchat
+email: me@seanp.xyz
+description: >
+  An end-to-end encrypted chat program that offers complete security
+  for communications between two friends.  Don't ever actually use it
+  for something real, it's almost certainly flawed in some way.
+baseurl: ""
+url: ""
+fixedNav: 'false' # true or false
+theme: blue # green, blue, orange, purple, grey
+twitterUsername: 
+githubUsername: iburinoc/ibchat
+dribbbleUsername:
+codepenUsername:
+
+# Build settings
+permalink: /:year/:month/:title
+markdown: kramdown
+include: [_pages]
+exclude: [_site, CHANGELOG.md, LICENSE, README.md, material-jekyll-theme, .gitignore]
+sass:
+  style: compressed
