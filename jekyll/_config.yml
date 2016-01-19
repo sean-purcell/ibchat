@@ -21,3 +21,4 @@ include: [_pages]
 exclude: [_site, CHANGELOG.md, LICENSE, README.md, material-jekyll-theme, .gitignore]
 sass:
   style: compressed
+  sass_dir: _sass
