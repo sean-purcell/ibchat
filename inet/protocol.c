@@ -333,7 +333,6 @@ void *handle_connection(void *_con) {
 
 			pthread_mutex_unlock(&con->out_mutex);
 		}
-		endwrite:;
 
 		/* check the acknowledges to make sure we're not overrun now */
 		gettimeofday(&now, NULL);
