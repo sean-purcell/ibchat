@@ -81,7 +81,7 @@ int start_conversation_graphic(struct friend *f) {
 
 	while(1) {
 		char c;
-		scanf("%c", &c);
+		if(scanf("%c", &c) != 1) continue;
 		home_curs();
 		printf("%x %d", c, isprint(c));
 		repaint_conv(f, messages);
@@ -303,7 +303,7 @@ static int parse_conv_message_payload(struct friend *f,
 	struct cmessage **m);
 
 int parse_conv_message(uint8_t *sender, uint8_t *payload, uint64_t plen) {
-	int ret = -1, inv = -1;
+	int ret = -1;
 
 	struct friend *f = NULL;
 	struct cmessage *m = NULL;
@@ -353,7 +353,6 @@ int parse_conv_message(uint8_t *sender, uint8_t *payload, uint64_t plen) {
 		goto err;
 	}
 
-	inv = 0;
 inv:
 	ret = 0;
 err:
