@@ -21,7 +21,7 @@ sudo make install
 The user data files should be completely secure, even to anyone who has read/write access to your computer, as they're all encrypted.  When you connect to a server for the first time, make sure you verify the server's public key with a trusted source.  If using the default server (ibchat.seanp.xyz), the public key signature must match
 
 {% highlight bash %}
-INSERT HERE
+26fa61b57be5b49c0aa7035fa4c7c5136f15e67836b24b15d60aa35aadd56050
 {% endhighlight %}
 
 If it doesn't, do not accept the server's public key, as it is an impersonation attempt!
