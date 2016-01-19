@@ -100,7 +100,7 @@ void init_handler(struct con_handle *con, int sockfd) {
 	pthread_mutex_init(&con->in_mutex, NULL);
 	pthread_mutex_init(&con->kill_mutex, NULL);
 	pthread_cond_init(&con->in_cond, NULL);
-	pipe(con->out_cond);
+	if(pipe(con->out_cond)) ERR("too many file descriptors open");
 	con->ka_last_recv = 0;
 	con->kill = 0;
 }
